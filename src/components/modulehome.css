@@ -1,0 +1,69 @@
+/* ---- Breadcrumb ---- */
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-faint);
+  margin-bottom: 14px;
+}
+.breadcrumb a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.breadcrumb a:hover {
+  color: var(--primary);
+}
+.breadcrumb span {
+  color: var(--text);
+  font-weight: 700;
+}
+
+/* ---- Module header ---- */
+.mod-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.mod-mark {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  flex-shrink: 0;
+  background: linear-gradient(
+    150deg,
+    var(--accent, var(--primary)),
+    color-mix(in srgb, var(--accent, var(--primary)) 60%, #000 8%)
+  );
+  box-shadow: var(--shadow-md);
+}
+.mod-title {
+  font-size: 25px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+}
+.mod-desc {
+  font-size: 13.5px;
+  color: var(--text-muted);
+  margin-top: 3px;
+  max-width: 640px;
+}
+.mod-cta {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+@media (max-width: 700px) {
+  .mod-cta {
+    display: none;
+  }
+  .mod-title {
+    font-size: 21px;
+  }
+}

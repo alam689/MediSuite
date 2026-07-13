@@ -1,0 +1,88 @@
+/* ---- Greeting header ---- */
+.greeting {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.greet-title {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+}
+.greet-date {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+.greeting .btn {
+  margin-left: auto;
+}
+
+/* ---- Module cards grid ---- */
+.module-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+.mod-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition);
+}
+.mod-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+}
+.mod-card-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  flex-shrink: 0;
+}
+.mod-card-body {
+  flex: 1;
+  min-width: 0;
+}
+.mod-card-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+.mod-card-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mod-card-arrow {
+  color: var(--text-faint);
+  transition: var(--transition);
+  flex-shrink: 0;
+}
+.mod-card:hover .mod-card-arrow {
+  color: var(--accent);
+  transform: translateX(3px);
+}
+
+@media (max-width: 640px) {
+  .greet-title {
+    font-size: 23px;
+  }
+  .greeting .btn {
+    display: none;
+  }
+}
