@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
   ChevronRight,
@@ -18,6 +18,7 @@ import {
   Rss,
   ArrowRight,
   Accessibility,
+  Scan,
 } from 'lucide-react'
 import { schemaMap } from '../data/schemas.js'
 import { useData, newId, relTime } from '../store/DataStore.jsx'
@@ -39,6 +40,10 @@ import AIStudio from '../features/AIStudio.jsx'
 import AnalyticsInsights from '../features/AnalyticsInsights.jsx'
 import './cards.css'
 import './modulehome.css'
+
+/* The imaging module pulls in the WebGPU pipeline, shaders and phantom
+   volume. Only load it when someone opens the viewer. */
+const ImagingStudio = lazy(() => import('../features/ImagingStudio.jsx'))
 
 const toneVar = (t) => `var(--tone-${t})`
 
@@ -103,6 +108,7 @@ export default function Workspace() {
   if (schema.hasConsole)
     tabs.push({ key: 'console', label: 'Live Console', icon: Video, badge: rows.filter((r) => r.status === 'Waiting' || r.status === 'Queued').length })
   if (schema.hasAccessible) tabs.push({ key: 'accessible', label: 'Accessible Care', icon: Accessibility })
+  if (schema.hasImaging) tabs.push({ key: 'imaging', label: 'Imaging Viewer', icon: Scan })
   if (schema.hasBooking) tabs.push({ key: 'booking', label: 'Book', icon: CalendarPlus })
   if (schema.hasMonitor) tabs.push({ key: 'monitor', label: 'Live Monitor', icon: Activity })
   if (schema.hasAI) tabs.push({ key: 'ai', label: 'AI Studio', icon: Sparkles })
@@ -384,6 +390,17 @@ export default function Workspace() {
         )}
         {tab === 'console' && <TelemedicineConsole schema={schema} />}
         {tab === 'accessible' && <AccessibleConsult schema={schema} />}
+        {tab === 'imaging' && (
+          <Suspense
+            fallback={
+              <p style={{ padding: '18px 4px', fontSize: 13, color: 'var(--text-faint)' }}>
+                Loading imaging pipeline…
+              </p>
+            }
+          >
+            <ImagingStudio schema={schema} />
+          </Suspense>
+        )}
         {tab === 'booking' && <AppointmentBooking schema={schema} />}
         {tab === 'monitor' && <RpmMonitor schema={schema} />}
         {tab === 'ai' && <AIStudio schema={schema} />}

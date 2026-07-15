@@ -13,6 +13,8 @@ import {
   Sparkles,
   ShieldCheck,
   BarChart3,
+  HeartPulse,
+  Building2,
 } from 'lucide-react'
 import ThemeToggle from '../components/ThemeToggle.jsx'
 import './login.css'
@@ -28,14 +30,30 @@ const chips = [
   { icon: ShieldCheck, label: 'Compliance' },
 ]
 
+const ACCOUNTS = {
+  clinician: { email: 'dr.rehana@metrogeneral.health', to: '/app', label: 'Clinician', icon: Stethoscope },
+  hospital: { email: 'admin@metrogeneral.health', to: '/hospital', label: 'Hospital admin', icon: Building2 },
+  patient: { email: 'anika.rahman@mail.health', to: '/patient', label: 'Patient', icon: HeartPulse },
+}
+
 export default function Login() {
   const navigate = useNavigate()
-  const [email, setEmail] = useState('dr.rehana@metrogeneral.health')
+  const [role, setRole] = useState('clinician')
+  const [email, setEmail] = useState(ACCOUNTS.clinician.email)
   const [password, setPassword] = useState('demo-password')
+
+  // Swap the demo address with the role so the prefilled account always
+  // matches the workspace you'd land in.
+  const pickRole = (next) => {
+    setRole(next)
+    setEmail((current) =>
+      Object.values(ACCOUNTS).some((a) => a.email === current) ? ACCOUNTS[next].email : current
+    )
+  }
 
   const submit = (e) => {
     e.preventDefault()
-    navigate('/app')
+    navigate(ACCOUNTS[role].to)
   }
 
   return (
@@ -92,6 +110,25 @@ export default function Login() {
           <h2 className="auth-title">Welcome back</h2>
           <p className="auth-sub">Sign in to your MediSuite workspace</p>
 
+          <div className="role-switch" role="radiogroup" aria-label="Sign in as">
+            {Object.entries(ACCOUNTS).map(([key, a]) => {
+              const Icon = a.icon
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  role="radio"
+                  aria-checked={role === key}
+                  className={`role-opt ${role === key ? 'on' : ''}`}
+                  onClick={() => pickRole(key)}
+                >
+                  <Icon size={15} />
+                  {a.label}
+                </button>
+              )
+            })}
+          </div>
+
           <label className="field">
             <span className="field-label">Email address</span>
             <span className="field-wrap">
@@ -134,7 +171,13 @@ export default function Login() {
           </button>
 
           <p className="auth-hint">
-            Demo build — any credentials continue to the dashboard.
+            Demo build — any credentials continue to the{' '}
+            {role === 'patient'
+              ? 'patient portal'
+              : role === 'hospital'
+                ? 'hospital admin desk'
+                : 'clinician workspace'}
+            .
           </p>
         </form>
 

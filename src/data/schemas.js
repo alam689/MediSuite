@@ -18,6 +18,7 @@ import {
   Sparkles,
   BarChart3,
   ShieldCheck,
+  BedDouble,
 } from 'lucide-react'
 
 const accents = {
@@ -38,6 +39,29 @@ const accents = {
 /* small helpers for KPI compute */
 const count = (rows, pred) => rows.filter(pred).length
 const byStatus = (rows, ...s) => count(rows, (r) => s.includes(r.status))
+
+/* Critical-care units. "Life support" is the phrase families use; the
+   clinical label is mechanical ventilation, so carry both. */
+export const CARE_UNITS = [
+  'ICU',
+  'CCU (cardiac)',
+  'HDU (high dependency)',
+  'NICU (newborn)',
+  'PICU (paediatric)',
+  'Ventilator / life support',
+  'Isolation',
+]
+
+/* Free beds are always derived, never stored. A stored "available" column
+   drifts out of sync with total/occupied the first time anyone edits one of
+   them, and a wrong bed count here is not a cosmetic bug. */
+export const freeBeds = (r) =>
+  Math.max(0, Number(r?.total || 0) - Number(r?.occupied || 0))
+
+const sumFree = (rows, pred) =>
+  rows.filter(pred).reduce((n, r) => n + freeBeds(r), 0)
+
+const mins = (n) => Date.now() - n * 60000
 
 /* Tiny inline SVG data URLs so seeded photos/documents are viewable without a backend. */
 const svg = (markup) =>
@@ -406,6 +430,7 @@ export const schemas = [
     formFields: [
       { key: 'patient', label: 'Patient', type: 'text', required: true },
       { key: 'doctor', label: 'Doctor', type: 'select', options: ['Dr. Malik', 'Dr. Bello', 'Dr. Nair', 'Dr. Rossi', 'Dr. Lin Wei'], required: true },
+      { key: 'hospital', label: 'Hospital / chamber', type: 'text', full: true },
       { key: 'date', label: 'Date', type: 'date' },
       { key: 'time', label: 'Time', type: 'text', required: true },
       { key: 'type', label: 'Type', type: 'select', options: ['Video', 'In-person', 'Emergency'] },
@@ -423,12 +448,12 @@ export const schemas = [
       { key: 'cancel', label: 'Cancel', tone: 'rose', when: (r) => r.status !== 'Cancelled', patch: () => ({ status: 'Cancelled' }), toast: 'Appointment cancelled' },
     ],
     seed: [
-      { resourceId: 'AP-5521', time: '09:30', patient: 'Anika Rahman', doctor: 'Dr. Malik', date: '2026-07-13', type: 'Video', status: 'Confirmed' },
-      { resourceId: 'AP-5522', time: '10:00', patient: 'David Chen', doctor: 'Dr. Rossi', date: '2026-07-13', type: 'In-person', status: 'Checked-in' },
-      { resourceId: 'AP-5525', time: '10:30', patient: 'Meera Iyer', doctor: 'Dr. Nair', date: '2026-07-13', type: 'Video', status: 'Pending' },
-      { resourceId: 'AP-5529', time: '11:15', patient: 'Fatima Al-Sayed', doctor: 'Dr. Bello', date: '2026-07-13', type: 'Emergency', status: 'Urgent' },
-      { resourceId: 'AP-5533', time: '13:00', patient: 'James Okoro', doctor: 'Dr. Malik', date: '2026-07-14', type: 'Video', status: 'Pending' },
-      { resourceId: 'AP-5540', time: '14:30', patient: 'Grace Wanjiru', doctor: 'Dr. Lin Wei', date: '2026-07-14', type: 'Video', status: 'Confirmed' },
+      { resourceId: 'AP-5521', time: '09:30', patient: 'Anika Rahman', doctor: 'Dr. Malik', hospital: 'Metro General Hospital', date: '2026-07-13', type: 'Video', status: 'Confirmed' },
+      { resourceId: 'AP-5522', time: '10:00', patient: 'David Chen', doctor: 'Dr. Rossi', hospital: 'Respira Clinic', date: '2026-07-13', type: 'In-person', status: 'Checked-in' },
+      { resourceId: 'AP-5525', time: '10:30', patient: 'Meera Iyer', doctor: 'Dr. Nair', hospital: 'Endo & Diabetes Clinic', date: '2026-07-13', type: 'Video', status: 'Pending' },
+      { resourceId: 'AP-5529', time: '11:15', patient: 'Fatima Al-Sayed', doctor: 'Dr. Bello', hospital: 'Metro Imaging Center', date: '2026-07-13', type: 'Emergency', status: 'Urgent' },
+      { resourceId: 'AP-5533', time: '13:00', patient: 'James Okoro', doctor: 'Dr. Malik', hospital: 'Metro General Hospital', date: '2026-07-14', type: 'Video', status: 'Pending' },
+      { resourceId: 'AP-5540', time: '14:30', patient: 'Grace Wanjiru', doctor: 'Dr. Lin Wei', hospital: 'SkinHealth Clinic', date: '2026-07-14', type: 'Video', status: 'Confirmed' },
     ],
   },
 
@@ -534,6 +559,7 @@ export const schemas = [
     desc: 'Test orders, sample tracking, analyzer integration and AI interpretation.',
     entity: 'Lab order',
     idPrefix: 'LAB',
+    hasImaging: true,
     statusTones: { Abnormal: 'rose', 'In lab': 'blue', 'Ready to approve': 'amber', Approved: 'green' },
     columns: [
       { key: 'resourceId', label: 'ID', type: 'ref' },
@@ -608,6 +634,83 @@ export const schemas = [
       { resourceId: 'PH-8805', name: 'Amoxicillin 500mg', batch: 'B-2291', stock: 210, expiry: '2026-08-01', status: 'Expiring' },
       { resourceId: 'PH-8800', name: 'Insulin Glargine', batch: 'B-4102', stock: 18, expiry: '2026-11-20', status: 'Low stock' },
       { resourceId: 'PH-8795', name: 'Levothyroxine 75mcg', batch: 'B-4055', stock: 480, expiry: '2027-06-10', status: 'In stock' },
+    ],
+  },
+
+  /* ------------------------------------------------------ Bed capacity */
+  {
+    key: 'capacity',
+    label: 'Bed Capacity',
+    icon: BedDouble,
+    accent: accents.rose,
+    tagline: 'Critical Care Capacity',
+    desc: 'ICU, CCU, ventilator and high-dependency bed availability across facilities.',
+    entity: 'Unit',
+    idPrefix: 'CAP',
+    statusTones: { Open: 'green', Diverting: 'amber', Closed: 'rose' },
+    columns: [
+      { key: 'resourceId', label: 'ID', type: 'ref' },
+      { key: 'hospital', label: 'Facility', type: 'strong' },
+      { key: 'unit', label: 'Unit', filter: true },
+      { key: 'beds', label: 'Free / total', render: (r) => `${freeBeds(r)} / ${r.total || 0}` },
+      { key: 'status', label: 'Status', type: 'pill', filter: true },
+    ],
+    formFields: [
+      { key: 'hospital', label: 'Facility', type: 'text', required: true, full: true },
+      { key: 'address', label: 'Address', type: 'text', full: true },
+      { key: 'unit', label: 'Unit', type: 'select', options: CARE_UNITS, required: true },
+      { key: 'total', label: 'Total beds', type: 'number', required: true },
+      { key: 'occupied', label: 'Occupied', type: 'number', required: true },
+      { key: 'phone', label: 'Admissions phone', type: 'text' },
+      {
+        key: 'status',
+        label: 'Operational status',
+        type: 'select',
+        // Separate from the bed count: a unit can be closed for cleaning or
+        // diverting on staffing while beds sit physically empty.
+        options: ['Open', 'Diverting', 'Closed'],
+      },
+    ],
+    defaults: { status: 'Open', unit: 'ICU', total: 10, occupied: 0 },
+    kpis: [
+      { label: 'ICU free', tone: 'rose', compute: (r) => sumFree(r, (x) => x.unit === 'ICU' && x.status === 'Open').toString() },
+      { label: 'CCU free', tone: 'violet', compute: (r) => sumFree(r, (x) => x.unit === 'CCU (cardiac)' && x.status === 'Open').toString() },
+      { label: 'Ventilators free', tone: 'amber', compute: (r) => sumFree(r, (x) => x.unit === 'Ventilator / life support' && x.status === 'Open').toString() },
+      { label: 'Units full', tone: 'blue', compute: (r) => count(r, (x) => freeBeds(x) === 0).toString() },
+    ],
+    actions: [
+      {
+        key: 'admit',
+        label: 'Admit',
+        tone: 'blue',
+        when: (r) => freeBeds(r) > 0 && r.status === 'Open',
+        // Stamp the time on every change: patients are shown how old this
+        // number is, so it has to be truthful.
+        patch: (r) => ({ occupied: Number(r.occupied || 0) + 1, updatedAt: Date.now() }),
+        toast: 'Admission recorded — one bed fewer',
+      },
+      {
+        key: 'discharge',
+        label: 'Discharge',
+        tone: 'green',
+        when: (r) => Number(r.occupied || 0) > 0,
+        patch: (r) => ({ occupied: Number(r.occupied || 0) - 1, updatedAt: Date.now() }),
+        toast: 'Discharge recorded — one bed free',
+      },
+    ],
+    seed: [
+      { resourceId: 'CAP-101', hospital: 'Metro General Hospital', address: 'Gulshan, Dhaka', unit: 'ICU', total: 14, occupied: 11, phone: '+880 9611 550 101', status: 'Open', updatedAt: mins(6) },
+      { resourceId: 'CAP-102', hospital: 'Metro General Hospital', address: 'Gulshan, Dhaka', unit: 'CCU (cardiac)', total: 8, occupied: 8, phone: '+880 9611 550 102', status: 'Open', updatedAt: mins(11) },
+      { resourceId: 'CAP-103', hospital: 'Metro General Hospital', address: 'Gulshan, Dhaka', unit: 'Ventilator / life support', total: 10, occupied: 7, phone: '+880 9611 550 103', status: 'Open', updatedAt: mins(4) },
+      { resourceId: 'CAP-104', hospital: 'Metro General Hospital', address: 'Gulshan, Dhaka', unit: 'NICU (newborn)', total: 6, occupied: 4, phone: '+880 9611 550 104', status: 'Open', updatedAt: mins(19) },
+      { resourceId: 'CAP-105', hospital: 'HeartCare Diagnostic', address: 'Banani, Dhaka', unit: 'CCU (cardiac)', total: 6, occupied: 2, phone: '+880 9611 770 105', status: 'Open', updatedAt: mins(9) },
+      { resourceId: 'CAP-106', hospital: 'HeartCare Diagnostic', address: 'Banani, Dhaka', unit: 'ICU', total: 4, occupied: 4, phone: '+880 9611 770 106', status: 'Open', updatedAt: mins(27) },
+      { resourceId: 'CAP-107', hospital: 'Endo & Diabetes Clinic', address: 'Dhanmondi, Dhaka', unit: 'HDU (high dependency)', total: 5, occupied: 1, phone: '+880 9611 330 107', status: 'Diverting', updatedAt: mins(38) },
+      { resourceId: 'CAP-108', hospital: 'NeuroCare Center', address: 'Deira, Dubai', unit: 'ICU', total: 9, occupied: 6, phone: '+971 4 220 8108', status: 'Open', updatedAt: mins(14) },
+      { resourceId: 'CAP-109', hospital: 'Respira Clinic', address: 'Rome, Italy', unit: 'Ventilator / life support', total: 6, occupied: 3, phone: '+39 06 5510 109', status: 'Open', updatedAt: mins(52) },
+      // Deliberately stale, so the freshness warning has something to catch.
+      { resourceId: 'CAP-110', hospital: 'Metro Imaging Center', address: 'Ikeja, Lagos', unit: 'HDU (high dependency)', total: 4, occupied: 2, phone: '+234 802 445 7110', status: 'Open', updatedAt: mins(190) },
+      { resourceId: 'CAP-111', hospital: 'SkinHealth Clinic', address: 'Orchard, Singapore', unit: 'Isolation', total: 3, occupied: 0, phone: '+65 6820 6111', status: 'Closed', updatedAt: mins(75) },
     ],
   },
 
