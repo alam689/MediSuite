@@ -60,3 +60,4 @@ coverage/
 scratch_docx.txt
 scratch_*.txt
 *.tmp
+.claude/
