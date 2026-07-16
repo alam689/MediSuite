@@ -21,6 +21,9 @@ import {
   BarChart3,
   ShieldCheck,
   ListChecks,
+  Scan,
+  BedDouble,
+  PhoneCall,
 } from 'lucide-react'
 
 export const content = {
@@ -114,12 +117,27 @@ export const content = {
       { icon: Activity, title: 'Analyzer Integration', desc: 'Automated result capture from analyzers.', count: 'Auto', go: 'records' },
       { icon: Sparkles, title: 'AI Report Analysis', desc: 'Identifies abnormal values and trends.', count: 'Flagged', go: 'records' },
       { icon: ShieldCheck, title: 'Report Approval', desc: 'Pathologist review and sign-off.', count: 'Queue', go: 'records' },
+      { icon: Scan, title: 'Imaging Viewer', desc: 'GPU-accelerated study review with window/level and filters.', count: 'Open viewer', go: 'imaging' },
     ],
     feed: [
       { title: 'AI flagged abnormal CBC', sub: 'LAB-4471 · Hgb 9.1', minsAgo: 7 },
       { title: 'Result approved', sub: 'LAB-4455 · Dr. Path', minsAgo: 28 },
       { title: 'Sample received', sub: 'LAB-4472 · barcode scan', minsAgo: 45 },
       { title: 'Analyzer result imported', sub: 'LAB-4450', minsAgo: 100 },
+    ],
+  },
+  capacity: {
+    tiles: [
+      { icon: BedDouble, title: 'Live Bed Board', desc: 'ICU, CCU, ventilator and HDU occupancy.', count: 'Open board', go: 'records' },
+      { icon: Activity, title: 'Admit / Discharge', desc: 'Update occupancy as patients move.', count: 'Update', go: 'records' },
+      { icon: ShieldCheck, title: 'Divert Status', desc: 'Flag a unit as diverting or closed.', count: 'Manage', go: 'records' },
+      { icon: PhoneCall, title: 'Add a Unit', desc: 'Register a critical-care unit and its contact.', count: 'New unit', go: 'create' },
+    ],
+    feed: [
+      { title: 'ICU bed freed', sub: 'Metro General · 3 free', minsAgo: 6 },
+      { title: 'CCU now full', sub: 'Metro General · 0 free', minsAgo: 11 },
+      { title: 'Unit set to diverting', sub: 'Endo & Diabetes Clinic · HDU', minsAgo: 38 },
+      { title: 'Ventilator freed', sub: 'Respira Clinic · 3 free', minsAgo: 52 },
     ],
   },
   pharmacy: {

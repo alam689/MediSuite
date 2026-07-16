@@ -9,7 +9,11 @@ import { schemas } from '../data/schemas.js'
    each module's Activity panel and the dashboard.
    ===================================================================== */
 
-const STORAGE_KEY = 'medisuite-data-v5'
+/* Bump when the seed shape changes: saved records win over the seed, so an
+   existing browser would otherwise keep pre-change rows forever. v6 adds the
+   Bed Capacity module and the `hospital` field on appointments — without a
+   bump, a returning user's appointments belong to no facility. */
+const STORAGE_KEY = 'medisuite-data-v6'
 const DataContext = createContext(null)
 
 let idSeq = Date.now()
