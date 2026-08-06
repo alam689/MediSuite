@@ -2,12 +2,19 @@ import { useNavigate } from 'react-router-dom'
 import { Menu, Search, Bell, LogOut, RotateCcw } from 'lucide-react'
 import ThemeToggle from './ThemeToggle.jsx'
 import { useData } from '../store/DataStore.jsx'
+import { useAuth } from '../auth/AuthContext.jsx'
 import { useToast } from './ui/Toast.jsx'
 
 export default function Topbar({ onToggleCollapse, onToggleMobile }) {
   const navigate = useNavigate()
   const { resetAll } = useData()
+  const { signOut } = useAuth()
   const toast = useToast()
+
+  const logout = () => {
+    signOut()
+    navigate('/', { replace: true })
+  }
 
   const resetDemo = () => {
     if (window.confirm('Reset all demo data back to the seeded records?')) {
@@ -58,7 +65,7 @@ export default function Topbar({ onToggleCollapse, onToggleMobile }) {
           className="icon-btn"
           aria-label="Log out"
           title="Log out"
-          onClick={() => navigate('/')}
+          onClick={logout}
         >
           <LogOut size={18} />
         </button>

@@ -1,55 +1,94 @@
+import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
-import AppShell from './components/AppShell.jsx'
-import Workspace from './components/Workspace.jsx'
 import Login from './pages/Login.jsx'
-import Dashboard from './pages/Dashboard.jsx'
-import PatientShell from './patient/PatientShell.jsx'
-import PatientHome from './patient/PatientHome.jsx'
-import FindDoctor from './patient/FindDoctor.jsx'
-import BedSearch from './patient/BedSearch.jsx'
-import MyRecords from './patient/MyRecords.jsx'
-import MyPrescriptions from './patient/MyPrescriptions.jsx'
-import MyConsult from './patient/MyConsult.jsx'
-import MyPayments from './patient/MyPayments.jsx'
-import MyProfile from './patient/MyProfile.jsx'
-import HospitalShell from './hospital/HospitalShell.jsx'
-import HospitalHome from './hospital/HospitalHome.jsx'
-import HospitalBeds from './hospital/HospitalBeds.jsx'
-import HospitalAppointments from './hospital/HospitalAppointments.jsx'
-import HospitalStaff from './hospital/HospitalStaff.jsx'
+import RequireRole from './auth/RequireRole.jsx'
+
+/* One chunk per portal, fetched only when a role that may see it arrives.
+
+   The guard sits *outside* the lazy element on purpose: a patient who types
+   /lab is redirected before the laboratory chunk is ever requested. Login
+   stays eager — it is the first paint for every visitor. */
+const AdminRoutes = lazy(() => import('./pages/adminRoutes.jsx'))
+const PatientRoutes = lazy(() => import('./patient/routes.jsx'))
+const DoctorRoutes = lazy(() => import('./doctor/routes.jsx'))
+const PharmacyRoutes = lazy(() => import('./pharmacy/routes.jsx'))
+const LabRoutes = lazy(() => import('./lab/routes.jsx'))
+const HospitalRoutes = lazy(() => import('./hospital/routes.jsx'))
+
+/* Deliberately quiet. The chunks are small and local, so a spinner would
+   flash for a frame and read as jank; an empty frame reads as nothing. */
+function PortalLoading() {
+  return <div style={{ minHeight: '100vh', background: 'var(--bg)' }} aria-busy="true" />
+}
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Login />} />
+    <Suspense fallback={<PortalLoading />}>
+      <Routes>
+        <Route path="/" element={<Login />} />
 
-      {/* Clinician workspace */}
-      <Route path="/app" element={<AppShell />}>
-        <Route index element={<Dashboard />} />
-        <Route path="m/:key" element={<Workspace />} />
-      </Route>
+        {/* Administrator console — every module, platform-wide. */}
+        <Route
+          path="/app/*"
+          element={
+            <RequireRole roles={['admin']}>
+              <AdminRoutes />
+            </RequireRole>
+          }
+        />
 
-      {/* Patient portal — blueprint §8.4 */}
-      <Route path="/patient" element={<PatientShell />}>
-        <Route index element={<PatientHome />} />
-        <Route path="doctors" element={<FindDoctor />} />
-        <Route path="beds" element={<BedSearch />} />
-        <Route path="consult" element={<MyConsult />} />
-        <Route path="records" element={<MyRecords />} />
-        <Route path="prescriptions" element={<MyPrescriptions />} />
-        <Route path="payments" element={<MyPayments />} />
-        <Route path="profile" element={<MyProfile />} />
-      </Route>
+        {/* Patient portal — blueprint §4.1 */}
+        <Route
+          path="/patient/*"
+          element={
+            <RequireRole roles={['patient']}>
+              <PatientRoutes />
+            </RequireRole>
+          }
+        />
 
-      {/* Hospital admin — scoped to a single facility */}
-      <Route path="/hospital" element={<HospitalShell />}>
-        <Route index element={<HospitalHome />} />
-        <Route path="beds" element={<HospitalBeds />} />
-        <Route path="appointments" element={<HospitalAppointments />} />
-        <Route path="staff" element={<HospitalStaff />} />
-      </Route>
+        {/* Doctor workspace — one clinician's caseload. Blueprint §4.2 */}
+        <Route
+          path="/doctor/*"
+          element={
+            <RequireRole roles={['doctor']}>
+              <DoctorRoutes />
+            </RequireRole>
+          }
+        />
 
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        {/* Pharmacy — one dispensary. Blueprint §4.5 */}
+        <Route
+          path="/pharmacy/*"
+          element={
+            <RequireRole roles={['pharmacy']}>
+              <PharmacyRoutes />
+            </RequireRole>
+          }
+        />
+
+        {/* Diagnostic centre — one laboratory. Blueprint §4.4 */}
+        <Route
+          path="/lab/*"
+          element={
+            <RequireRole roles={['lab']}>
+              <LabRoutes />
+            </RequireRole>
+          }
+        />
+
+        {/* Hospital admin — one facility. Blueprint §4.6 */}
+        <Route
+          path="/hospital/*"
+          element={
+            <RequireRole roles={['hospital']}>
+              <HospitalRoutes />
+            </RequireRole>
+          }
+        />
+
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
   )
 }

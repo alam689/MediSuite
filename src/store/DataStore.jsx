@@ -10,10 +10,18 @@ import { schemas } from '../data/schemas.js'
    ===================================================================== */
 
 /* Bump when the seed shape changes: saved records win over the seed, so an
-   existing browser would otherwise keep pre-change rows forever. v6 adds the
-   Bed Capacity module and the `hospital` field on appointments — without a
-   bump, a returning user's appointments belong to no facility. */
-const STORAGE_KEY = 'medisuite-data-v6'
+   existing browser would otherwise keep pre-change rows forever. v7 adds
+   patient/doctor foreign keys, the pharmacy fulfilment and laboratory
+   sample lifecycles, and the Admissions and Departments modules — a
+   returning user without a bump would have prescriptions no pharmacy can
+   see and lab orders with no sample stage. v8 re-bases every calendar date
+   in the seed to the day the demo is opened.
+
+   Note what the bump does *not* do: saved records always win over the seed,
+   so a browser that has already stored records keeps the dates it captured.
+   That is correct — those are the user's edits — but it does mean the
+   relative dates only look fresh on a first load or after a reset. */
+const STORAGE_KEY = 'medisuite-data-v8'
 const DataContext = createContext(null)
 
 let idSeq = Date.now()

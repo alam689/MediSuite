@@ -224,16 +224,24 @@ export function chambersFor(doctor) {
 /* Plain-language wording for statuses a patient sees. Clinician-facing
    status vocabulary ("Ready to approve") means nothing to a patient. */
 export const LAB_STATUS_TEXT = {
+  Ordered: 'Waiting for your sample',
+  'Sample collected': 'Sample taken — on its way to the lab',
   'In lab': 'Being processed',
   'Ready to approve': 'Awaiting doctor review',
   Abnormal: 'Needs discussion with your doctor',
   Approved: 'Reviewed and released',
+  Rejected: 'Sample could not be used — a repeat is needed',
 }
 
 export const RX_STATUS_TEXT = {
-  Issued: 'Ready to collect',
-  Dispensed: 'Collected',
+  Issued: 'Sent to your pharmacy',
+  Verified: 'Pharmacy is preparing it',
+  'Partially dispensed': 'Part collected — remainder to follow',
+  Dispensed: 'Ready to collect',
+  'Out for delivery': 'On its way to you',
+  Delivered: 'Delivered',
   Refill: 'Refill available',
   Allergy: 'On hold — allergy check',
   Interaction: 'On hold — interaction check',
+  Rejected: 'Pharmacy could not fill this — contact your doctor',
 }

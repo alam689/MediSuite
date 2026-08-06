@@ -14,6 +14,9 @@ import {
 } from 'lucide-react'
 import ThemeToggle from '../components/ThemeToggle.jsx'
 import Avatar from '../components/ui/Avatar.jsx'
+import { useAuth } from '../auth/AuthContext.jsx'
+import NotificationBell from '../portal/NotificationBell.jsx'
+import { patientNotifications } from '../portal/notifications.js'
 import { usePatient, firstName } from './PatientContext.jsx'
 import './patient.css'
 
@@ -33,7 +36,23 @@ const NAV = [
 
 export default function PatientShell() {
   const navigate = useNavigate()
-  const { me, name } = usePatient()
+  const { signOut, role } = useAuth()
+  const { me, name, mine } = usePatient()
+
+  const logout = () => {
+    signOut()
+    navigate('/', { replace: true })
+  }
+
+  /* Same builder the rest of the app uses, so the bell and the home page
+     can never disagree about what is waiting. */
+  const notifications = patientNotifications({
+    appointments: mine('appointments'),
+    consults: mine('telemedicine'),
+    prescriptions: mine('prescriptions'),
+    labs: mine('laboratory'),
+    invoices: mine('billing'),
+  })
 
   return (
     <div className="pt-shell">
@@ -65,12 +84,13 @@ export default function PatientShell() {
           </nav>
 
           <div className="pt-top-right">
+            <NotificationBell role={role} items={notifications} />
             <ThemeToggle />
             <span className="pt-who" title={name}>
               <Avatar name={name} size={30} />
               <span className="pt-who-name">{firstName(name)}</span>
             </span>
-            <button className="icon-btn" onClick={() => navigate('/')} aria-label="Log out" title="Log out">
+            <button className="icon-btn" onClick={logout} aria-label="Log out" title="Log out">
               <LogOut size={17} />
             </button>
           </div>

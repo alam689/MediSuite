@@ -15,8 +15,10 @@ import {
   BarChart3,
   HeartPulse,
   Building2,
+  Store,
 } from 'lucide-react'
 import ThemeToggle from '../components/ThemeToggle.jsx'
+import { useAuth, ROLES, ROLE_KEYS } from '../auth/AuthContext.jsx'
 import './login.css'
 
 const chips = [
@@ -30,30 +32,46 @@ const chips = [
   { icon: ShieldCheck, label: 'Compliance' },
 ]
 
-const ACCOUNTS = {
-  clinician: { email: 'dr.rehana@metrogeneral.health', to: '/app', label: 'Clinician', icon: Stethoscope },
-  hospital: { email: 'admin@metrogeneral.health', to: '/hospital', label: 'Hospital admin', icon: Building2 },
-  patient: { email: 'anika.rahman@mail.health', to: '/patient', label: 'Patient', icon: HeartPulse },
+/* Icons live here rather than in ROLES: the auth module has no business
+   importing a component library. */
+const ICONS = {
+  patient: HeartPulse,
+  doctor: Stethoscope,
+  hospital: Building2,
+  pharmacy: Store,
+  lab: FlaskConical,
+  admin: ShieldCheck,
 }
+
+const WORKSPACE = {
+  patient: 'patient portal',
+  doctor: 'doctor workspace',
+  hospital: 'hospital admin desk',
+  pharmacy: 'pharmacy dispensary',
+  lab: 'laboratory bench',
+  admin: 'administrator console',
+}
+
+const seeded = (address) => ROLE_KEYS.some((k) => ROLES[k].email === address)
 
 export default function Login() {
   const navigate = useNavigate()
-  const [role, setRole] = useState('clinician')
-  const [email, setEmail] = useState(ACCOUNTS.clinician.email)
+  const { signIn } = useAuth()
+  const [role, setRole] = useState('patient')
+  const [email, setEmail] = useState(ROLES.patient.email)
   const [password, setPassword] = useState('demo-password')
 
   // Swap the demo address with the role so the prefilled account always
-  // matches the workspace you'd land in.
+  // matches the workspace you'd land in — unless it's been typed over.
   const pickRole = (next) => {
     setRole(next)
-    setEmail((current) =>
-      Object.values(ACCOUNTS).some((a) => a.email === current) ? ACCOUNTS[next].email : current
-    )
+    setEmail((current) => (seeded(current) ? ROLES[next].email : current))
   }
 
   const submit = (e) => {
     e.preventDefault()
-    navigate(ACCOUNTS[role].to)
+    signIn(role, email)
+    navigate(ROLES[role].home)
   }
 
   return (
@@ -111,8 +129,8 @@ export default function Login() {
           <p className="auth-sub">Sign in to your MediSuite workspace</p>
 
           <div className="role-switch" role="radiogroup" aria-label="Sign in as">
-            {Object.entries(ACCOUNTS).map(([key, a]) => {
-              const Icon = a.icon
+            {ROLE_KEYS.map((key) => {
+              const Icon = ICONS[key]
               return (
                 <button
                   key={key}
@@ -123,7 +141,7 @@ export default function Login() {
                   onClick={() => pickRole(key)}
                 >
                   <Icon size={15} />
-                  {a.label}
+                  {ROLES[key].label}
                 </button>
               )
             })}
@@ -171,13 +189,8 @@ export default function Login() {
           </button>
 
           <p className="auth-hint">
-            Demo build — any credentials continue to the{' '}
-            {role === 'patient'
-              ? 'patient portal'
-              : role === 'hospital'
-                ? 'hospital admin desk'
-                : 'clinician workspace'}
-            .
+            Demo build — any credentials continue to the {WORKSPACE[role]}. Each role sees only
+            its own workspace.
           </p>
         </form>
 

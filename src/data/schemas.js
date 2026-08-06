@@ -19,6 +19,8 @@ import {
   BarChart3,
   ShieldCheck,
   BedDouble,
+  ClipboardPlus,
+  Network,
 } from 'lucide-react'
 
 const accents = {
@@ -39,6 +41,22 @@ const accents = {
 /* small helpers for KPI compute */
 const count = (rows, pred) => rows.filter(pred).length
 const byStatus = (rows, ...s) => count(rows, (r) => s.includes(r.status))
+
+/* The dispensaries and labs on the platform. A pharmacist or lab tech signs
+   in scoped to one of these, exactly as a hospital admin signs in scoped to
+   a facility, so the names have to be a shared constant rather than free
+   text typed twice. */
+export const PHARMACIES = [
+  'Metro General Pharmacy',
+  'HeartCare Dispensary',
+  'City Care Pharmacy',
+]
+
+export const LABS = [
+  'Metro Diagnostics Lab',
+  'HeartCare Pathology',
+  'Respira Diagnostics',
+]
 
 /* Critical-care units. "Life support" is the phrase families use; the
    clinical label is mechanical ventilation, so carry both. */
@@ -62,6 +80,24 @@ const sumFree = (rows, pred) =>
   rows.filter(pred).reduce((n, r) => n + freeBeds(r), 0)
 
 const mins = (n) => Date.now() - n * 60000
+
+/* Calendar dates in the seed are relative to whenever the demo is opened.
+
+   Hard-coded dates rot: written in July, every "upcoming" view is empty by
+   August and a pending appointment reads as one nobody answered. The whole
+   scheduling half of the app then looks broken when it is working exactly as
+   designed. Negative is the past, positive the future.
+
+   Local-zone arithmetic, not `toISOString().slice(0,10)` — converting to UTC
+   first hands anyone east of UTC yesterday's date, and the rest of the app
+   reads these strings as local days (see patient/helpers.js prettyDate).
+   Defined here rather than imported because helpers.js imports this file. */
+const day = (offset = 0) => {
+  const d = new Date()
+  d.setDate(d.getDate() + offset)
+  const shifted = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+  return shifted.toISOString().slice(0, 10)
+}
 
 /* Tiny inline SVG data URLs so seeded photos/documents are viewable without a backend. */
 const svg = (markup) =>
@@ -171,8 +207,8 @@ export const schemas = [
           { condition: 'Iron-deficiency anaemia', since: '2024', status: 'Active' },
         ],
         visits: [
-          { date: '2026-06-10', doctor: 'Dr. Malik', reason: 'Chest tightness', outcome: 'Started beta-blocker' },
-          { date: '2026-03-02', doctor: 'Dr. Malik', reason: 'Routine review', outcome: 'Stable' },
+          { date: day(-7), doctor: 'Dr. Malik', reason: 'Chest tightness', outcome: 'Started beta-blocker' },
+          { date: day(-58), doctor: 'Dr. Malik', reason: 'Routine review', outcome: 'Stable' },
         ],
         medications: [
           { name: 'Bisoprolol', dosage: '5mg OD', since: '2026' },
@@ -185,7 +221,7 @@ export const schemas = [
       },
       { resourceId: 'PT-90418', name: 'James Okoro', age: 51, gender: 'Male', department: 'General Med', phone: '+234 802 445 118', insurance: 'BUPA', status: 'Consent pending', allergies: 'Penicillin',
         conditions: [{ condition: 'Type 2 Diabetes', since: '2019', status: 'Active' }],
-        visits: [{ date: '2026-05-20', doctor: 'Dr. Malik', reason: 'BP management', outcome: 'Adjusted meds' }],
+        visits: [{ date: day(-21), doctor: 'Dr. Malik', reason: 'BP management', outcome: 'Adjusted meds' }],
         medications: [{ name: 'Metformin', dosage: '850mg BD', since: '2019' }],
         documents: [{ id: 'DOC-PT90418-1', name: 'HbA1c_Report.svg', kind: 'image', type: 'Image', size: 1200, uploadedAt: 1748000000000, dataUrl: seedDoc('Lab Report — HbA1c', ['Patient: James Okoro', 'HbA1c: 8.2% (elevated)', 'Date: 2026-05-18']) }],
       },
@@ -381,6 +417,8 @@ export const schemas = [
       { key: 'patient', label: 'Patient', type: 'text', required: true },
       { key: 'doctor', label: 'Doctor', type: 'text', required: true },
       { key: 'mode', label: 'Mode', type: 'select', options: ['Video', 'Audio', 'Chat'] },
+      { key: 'date', label: 'Date', type: 'date' },
+      { key: 'time', label: 'Time', type: 'text' },
       { key: 'reason', label: 'Reason', type: 'text', full: true },
       { key: 'status', label: 'Status', type: 'select', options: ['Queued', 'Waiting', 'Live', 'Ended', 'Completed'] },
     ],
@@ -398,12 +436,12 @@ export const schemas = [
       { key: 'complete', label: 'Complete', tone: 'green', when: (r) => r.status === 'Ended', patch: () => ({ status: 'Completed', resumeRequested: false }), toast: 'Consultation completed' },
     ],
     seed: [
-      { resourceId: 'CS-7781', patient: 'Anika Rahman', doctor: 'Dr. Malik', mode: 'Video', reason: 'Chest pain review', status: 'Live' },
-      { resourceId: 'CS-7780', patient: 'David Chen', doctor: 'Dr. Rossi', mode: 'Audio', reason: 'Follow-up', status: 'Waiting' },
-      { resourceId: 'CS-7778', patient: 'Meera Iyer', doctor: 'Dr. Nair', mode: 'Video', reason: 'Thyroid results', status: 'Queued' },
-      { resourceId: 'CS-7775', patient: 'Fatima Al-Sayed', doctor: 'Dr. Bello', mode: 'Chat', reason: 'Triage', status: 'Waiting' },
-      { resourceId: 'CS-7770', patient: 'James Okoro', doctor: 'Dr. Malik', mode: 'Video', reason: 'BP management', status: 'Completed' },
-      { resourceId: 'CS-7766', patient: 'Grace Wanjiru', doctor: 'Dr. Lin Wei', mode: 'Video', reason: 'Skin rash', status: 'Queued' },
+      { resourceId: 'CS-7781', patient: 'Anika Rahman', doctor: 'Dr. Malik', mode: 'Video', date: day(0), time: '09:30', reason: 'Chest pain review', status: 'Live' },
+      { resourceId: 'CS-7780', patient: 'David Chen', doctor: 'Dr. Rossi', mode: 'Audio', date: day(0), time: '10:00', reason: 'Follow-up', status: 'Waiting' },
+      { resourceId: 'CS-7778', patient: 'Meera Iyer', doctor: 'Dr. Nair', mode: 'Video', date: day(0), time: '10:30', reason: 'Thyroid results', status: 'Queued' },
+      { resourceId: 'CS-7775', patient: 'Fatima Al-Sayed', doctor: 'Dr. Bello', mode: 'Chat', date: day(0), time: '11:15', reason: 'Triage', status: 'Waiting' },
+      { resourceId: 'CS-7770', patient: 'James Okoro', doctor: 'Dr. Malik', mode: 'Video', date: day(-21), time: '11:00', reason: 'BP management', status: 'Completed' },
+      { resourceId: 'CS-7766', patient: 'Grace Wanjiru', doctor: 'Dr. Lin Wei', mode: 'Video', date: day(2), time: '14:30', reason: 'Skin rash', status: 'Queued' },
     ],
   },
 
@@ -448,12 +486,17 @@ export const schemas = [
       { key: 'cancel', label: 'Cancel', tone: 'rose', when: (r) => r.status !== 'Cancelled', patch: () => ({ status: 'Cancelled' }), toast: 'Appointment cancelled' },
     ],
     seed: [
-      { resourceId: 'AP-5521', time: '09:30', patient: 'Anika Rahman', doctor: 'Dr. Malik', hospital: 'Metro General Hospital', date: '2026-07-13', type: 'Video', status: 'Confirmed' },
-      { resourceId: 'AP-5522', time: '10:00', patient: 'David Chen', doctor: 'Dr. Rossi', hospital: 'Respira Clinic', date: '2026-07-13', type: 'In-person', status: 'Checked-in' },
-      { resourceId: 'AP-5525', time: '10:30', patient: 'Meera Iyer', doctor: 'Dr. Nair', hospital: 'Endo & Diabetes Clinic', date: '2026-07-13', type: 'Video', status: 'Pending' },
-      { resourceId: 'AP-5529', time: '11:15', patient: 'Fatima Al-Sayed', doctor: 'Dr. Bello', hospital: 'Metro Imaging Center', date: '2026-07-13', type: 'Emergency', status: 'Urgent' },
-      { resourceId: 'AP-5533', time: '13:00', patient: 'James Okoro', doctor: 'Dr. Malik', hospital: 'Metro General Hospital', date: '2026-07-14', type: 'Video', status: 'Pending' },
-      { resourceId: 'AP-5540', time: '14:30', patient: 'Grace Wanjiru', doctor: 'Dr. Lin Wei', hospital: 'SkinHealth Clinic', date: '2026-07-14', type: 'Video', status: 'Confirmed' },
+      { resourceId: 'AP-5521', time: '09:30', patient: 'Anika Rahman', doctor: 'Dr. Malik', hospital: 'Metro General Hospital', date: day(0), type: 'Video', status: 'Confirmed' },
+      { resourceId: 'AP-5522', time: '10:00', patient: 'David Chen', doctor: 'Dr. Rossi', hospital: 'Respira Clinic', date: day(0), type: 'In-person', status: 'Checked-in' },
+      { resourceId: 'AP-5525', time: '10:30', patient: 'Meera Iyer', doctor: 'Dr. Nair', hospital: 'Endo & Diabetes Clinic', date: day(0), type: 'Video', status: 'Pending' },
+      { resourceId: 'AP-5529', time: '11:15', patient: 'Fatima Al-Sayed', doctor: 'Dr. Bello', hospital: 'Metro Imaging Center', date: day(0), type: 'Emergency', status: 'Urgent' },
+      { resourceId: 'AP-5533', time: '13:00', patient: 'James Okoro', doctor: 'Dr. Malik', hospital: 'Metro General Hospital', date: day(1), type: 'Video', status: 'Pending' },
+      { resourceId: 'AP-5540', time: '14:30', patient: 'Grace Wanjiru', doctor: 'Dr. Lin Wei', hospital: 'SkinHealth Clinic', date: day(2), type: 'Video', status: 'Confirmed' },
+      { resourceId: 'AP-5544', time: '16:00', patient: 'Anika Rahman', doctor: 'Dr. Malik', hospital: 'HeartCare Diagnostic', date: day(5), type: 'In-person', status: 'Confirmed' },
+      /* Past bookings, so the "Past" tab and visit history are not empty. */
+      { resourceId: 'AP-5510', time: '09:00', patient: 'Anika Rahman', doctor: 'Dr. Malik', hospital: 'Metro General Hospital', date: day(-7), type: 'Video', status: 'Confirmed' },
+      { resourceId: 'AP-5502', time: '11:00', patient: 'James Okoro', doctor: 'Dr. Malik', hospital: 'Metro General Hospital', date: day(-21), type: 'In-person', status: 'Confirmed' },
+      { resourceId: 'AP-5498', time: '15:30', patient: 'David Chen', doctor: 'Dr. Rossi', hospital: 'Respira Clinic', date: day(-30), type: 'Video', status: 'Cancelled' },
     ],
   },
 
@@ -512,12 +555,28 @@ export const schemas = [
     desc: 'Digital signature, drug database, interaction alerts and refill management.',
     entity: 'Prescription',
     idPrefix: 'RX',
-    statusTones: { Interaction: 'rose', Allergy: 'amber', Refill: 'violet', Issued: 'green', Dispensed: 'blue' },
+    /* The fulfilment half of this lifecycle belongs to the pharmacy, not the
+       prescriber: Issued → Verified → (Partially) Dispensed → Out for
+       delivery → Delivered, with Rejected as the pharmacist's stop. The
+       clinical holds (Interaction, Allergy, Refill) stay with the doctor. */
+    statusTones: {
+      Interaction: 'rose',
+      Allergy: 'amber',
+      Refill: 'violet',
+      Issued: 'green',
+      Verified: 'teal',
+      'Partially dispensed': 'amber',
+      Dispensed: 'blue',
+      'Out for delivery': 'violet',
+      Delivered: 'green',
+      Rejected: 'rose',
+    },
     columns: [
       { key: 'resourceId', label: 'ID', type: 'ref' },
       { key: 'drug', label: 'Medication', type: 'strong' },
       { key: 'patient', label: 'Patient' },
       { key: 'doctor', label: 'Doctor', filter: true },
+      { key: 'pharmacy', label: 'Pharmacy', filter: true },
       { key: 'flag', label: 'Flag', filter: true },
       { key: 'status', label: 'Status', type: 'pill', filter: true },
     ],
@@ -526,26 +585,38 @@ export const schemas = [
       { key: 'patient', label: 'Patient', type: 'text', required: true },
       { key: 'doctor', label: 'Doctor', type: 'text', required: true },
       { key: 'dosage', label: 'Dosage', type: 'text' },
+      { key: 'qty', label: 'Quantity', type: 'number' },
+      { key: 'days', label: 'Duration (days)', type: 'number' },
+      { key: 'refills', label: 'Refills allowed', type: 'number' },
+      { key: 'pharmacy', label: 'Dispensing pharmacy', type: 'select', options: PHARMACIES },
+      { key: 'fulfilment', label: 'Fulfilment', type: 'select', options: ['Collect in store', 'Home delivery'] },
       { key: 'flag', label: 'Flag', type: 'select', options: ['None', 'Interaction', 'Allergy', 'Generic offered'] },
-      { key: 'status', label: 'Status', type: 'select', options: ['Issued', 'Interaction', 'Allergy', 'Refill', 'Dispensed'] },
+      { key: 'status', label: 'Status', type: 'select', options: ['Issued', 'Interaction', 'Allergy', 'Refill', 'Verified', 'Partially dispensed', 'Dispensed', 'Out for delivery', 'Delivered', 'Rejected'] },
+      { key: 'instructions', label: 'Instructions to patient', type: 'textarea', full: true },
     ],
-    defaults: { status: 'Issued', flag: 'None' },
+    defaults: { status: 'Issued', flag: 'None', qty: 30, days: 30, refills: 0, fulfilment: 'Collect in store', pharmacy: PHARMACIES[0], dispensedQty: 0 },
     kpis: [
       { label: 'Total', tone: 'rose', compute: (r) => r.length.toString() },
       { label: 'Interaction Alerts', tone: 'amber', compute: (r) => count(r, (x) => x.flag === 'Interaction').toString() },
-      { label: 'Refills Pending', tone: 'violet', compute: (r) => byStatus(r, 'Refill').toString() },
-      { label: 'Dispensed', tone: 'blue', compute: (r) => byStatus(r, 'Dispensed').toString() },
+      { label: 'Awaiting Pharmacy', tone: 'violet', compute: (r) => byStatus(r, 'Issued', 'Verified', 'Partially dispensed').toString() },
+      { label: 'Dispensed', tone: 'blue', compute: (r) => byStatus(r, 'Dispensed', 'Out for delivery', 'Delivered').toString() },
     ],
     actions: [
       { key: 'override', label: 'Approve', tone: 'green', when: (r) => r.status === 'Interaction' || r.status === 'Refill', patch: () => ({ status: 'Issued', flag: 'None' }), toast: 'Prescription approved & logged' },
-      { key: 'dispense', label: 'Dispense', tone: 'blue', when: (r) => r.status === 'Issued', patch: () => ({ status: 'Dispensed' }), toast: 'Sent to pharmacy — QR verified' },
     ],
+    /* `issuedAt` is not decoration: the pharmacy's authenticity check refuses
+       to verify a script it cannot date, so a seed row without one is a
+       prescription nobody can ever fill. RX-6590 is deliberately left old, so
+       the expiry branch of that check has something real to catch. */
     seed: [
-      { resourceId: 'RX-6612', drug: 'Warfarin 5mg', patient: 'Anika Rahman', doctor: 'Dr. Malik', dosage: 'OD', flag: 'Interaction', status: 'Interaction' },
-      { resourceId: 'RX-6609', drug: 'Amoxicillin 500mg', patient: 'James Okoro', doctor: 'Dr. Malik', dosage: 'TDS', flag: 'Allergy', status: 'Allergy' },
-      { resourceId: 'RX-6605', drug: 'Metformin 850mg', patient: 'Meera Iyer', doctor: 'Dr. Nair', dosage: 'BD', flag: 'None', status: 'Refill' },
-      { resourceId: 'RX-6601', drug: 'Atorvastatin 20mg', patient: 'David Chen', doctor: 'Dr. Rossi', dosage: 'Nocte', flag: 'Generic offered', status: 'Issued' },
-      { resourceId: 'RX-6598', drug: 'Levothyroxine 75mcg', patient: 'Meera Iyer', doctor: 'Dr. Nair', dosage: 'OD', flag: 'None', status: 'Dispensed' },
+      { resourceId: 'RX-6612', drug: 'Warfarin 5mg', patient: 'Anika Rahman', doctor: 'Dr. Malik', dosage: 'OD', qty: 28, days: 28, refills: 0, flag: 'Interaction', status: 'Interaction', pharmacy: 'Metro General Pharmacy', fulfilment: 'Collect in store', issuedAt: mins(1200), instructions: 'Take at the same time each evening. Do not skip INR checks.' },
+      { resourceId: 'RX-6609', drug: 'Amoxicillin 500mg', patient: 'James Okoro', doctor: 'Dr. Malik', dosage: 'TDS', qty: 21, days: 7, refills: 0, flag: 'Allergy', status: 'Allergy', pharmacy: 'Metro General Pharmacy', fulfilment: 'Collect in store', issuedAt: mins(2600) },
+      { resourceId: 'RX-6605', drug: 'Metformin 850mg', patient: 'Meera Iyer', doctor: 'Dr. Nair', dosage: 'BD', qty: 60, days: 30, refills: 2, flag: 'None', status: 'Refill', pharmacy: 'City Care Pharmacy', fulfilment: 'Home delivery', issuedAt: mins(40000) },
+      { resourceId: 'RX-6601', drug: 'Atorvastatin 20mg', patient: 'David Chen', doctor: 'Dr. Rossi', dosage: 'Nocte', qty: 30, days: 30, refills: 3, flag: 'Generic offered', status: 'Issued', pharmacy: 'Metro General Pharmacy', fulfilment: 'Collect in store', issuedAt: mins(300), instructions: 'One tablet at night.' },
+      { resourceId: 'RX-6598', drug: 'Levothyroxine 75mcg', patient: 'Meera Iyer', doctor: 'Dr. Nair', dosage: 'OD', qty: 30, days: 30, refills: 5, flag: 'None', status: 'Dispensed', pharmacy: 'City Care Pharmacy', fulfilment: 'Collect in store', issuedAt: mins(6000), dispensedQty: 30, dispensedBy: 'City Care Pharmacy' },
+      { resourceId: 'RX-6595', drug: 'Insulin Glargine 100U/mL', patient: 'James Okoro', doctor: 'Dr. Nair', dosage: '18U nocte', qty: 3, days: 30, refills: 2, flag: 'None', status: 'Issued', pharmacy: 'Metro General Pharmacy', fulfilment: 'Home delivery', issuedAt: mins(180), instructions: 'Keep refrigerated. Rotate injection sites.' },
+      { resourceId: 'RX-6590', drug: 'Salbutamol inhaler', patient: 'David Chen', doctor: 'Dr. Rossi', dosage: 'PRN', qty: 2, days: 60, refills: 4, flag: 'None', status: 'Verified', pharmacy: 'HeartCare Dispensary', fulfilment: 'Collect in store', issuedAt: mins(160000) },
+      { resourceId: 'RX-6586', drug: 'Bisoprolol 5mg', patient: 'Anika Rahman', doctor: 'Dr. Malik', dosage: 'OD', qty: 30, days: 30, refills: 5, flag: 'None', status: 'Out for delivery', pharmacy: 'Metro General Pharmacy', fulfilment: 'Home delivery', issuedAt: mins(2000), dispensedQty: 30, dispensedBy: 'Metro General Pharmacy' },
     ],
   },
 
@@ -560,36 +631,92 @@ export const schemas = [
     entity: 'Lab order',
     idPrefix: 'LAB',
     hasImaging: true,
-    statusTones: { Abnormal: 'rose', 'In lab': 'blue', 'Ready to approve': 'amber', Approved: 'green' },
+    hasDocuments: true,
+    /* The order's real life: Ordered → Sample collected → In lab → Ready to
+       approve → Approved (released to the patient). Abnormal is a result
+       property that still needs approving, not a terminal state, and
+       Rejected is the lab refusing a bad sample rather than a silent
+       re-draw nobody is told about. */
+    statusTones: {
+      Ordered: 'violet',
+      'Sample collected': 'teal',
+      'In lab': 'blue',
+      'Ready to approve': 'amber',
+      Abnormal: 'rose',
+      Approved: 'green',
+      Rejected: 'rose',
+    },
     columns: [
       { key: 'resourceId', label: 'ID', type: 'ref' },
       { key: 'test', label: 'Test', type: 'strong' },
       { key: 'patient', label: 'Patient' },
-      { key: 'result', label: 'Result', filter: true },
+      { key: 'lab', label: 'Lab', filter: true },
+      { key: 'priority', label: 'Priority', filter: true },
+      { key: 'result', label: 'Result' },
       { key: 'status', label: 'Status', type: 'pill', filter: true },
     ],
     formFields: [
-      { key: 'test', label: 'Test', type: 'select', options: ['CBC', 'Lipid Profile', 'HbA1c', 'Thyroid Panel', 'Liver Function', 'Kidney Function', 'Urinalysis'], required: true },
+      { key: 'test', label: 'Test', type: 'select', options: ['CBC', 'Lipid Profile', 'HbA1c', 'Thyroid Panel', 'Liver Function', 'Kidney Function', 'Urinalysis', 'Chest X-ray', 'CT Head', 'ECG'], required: true },
       { key: 'patient', label: 'Patient', type: 'text', required: true },
+      { key: 'doctor', label: 'Ordered by', type: 'text' },
+      { key: 'lab', label: 'Laboratory', type: 'select', options: LABS },
+      { key: 'priority', label: 'Priority', type: 'select', options: ['Routine', 'Urgent', 'STAT'] },
+      { key: 'sample', label: 'Sample type', type: 'select', options: ['Blood', 'Urine', 'Swab', 'Imaging', 'Stool', 'Tissue'] },
+      { key: 'accession', label: 'Accession no.', type: 'text' },
+      { key: 'clinicalNote', label: 'Clinical indication', type: 'text', full: true },
       { key: 'result', label: 'Result summary', type: 'text', full: true },
-      { key: 'status', label: 'Status', type: 'select', options: ['In lab', 'Ready to approve', 'Abnormal', 'Approved'] },
+      { key: 'interpretation', label: 'Interpretation', type: 'textarea', full: true },
+      { key: 'verifiedBy', label: 'Verified by', type: 'text' },
+      { key: 'status', label: 'Status', type: 'select', options: ['Ordered', 'Sample collected', 'In lab', 'Ready to approve', 'Abnormal', 'Approved', 'Rejected'] },
     ],
-    defaults: { status: 'In lab', result: 'Processing', test: 'CBC' },
+    /* Analytes are the report. A single "result" string cannot say which
+       value was out of range, and a range that isn't stored can't be
+       checked later against the value that was. */
+    subforms: [
+      {
+        key: 'analytes',
+        label: 'Analytes & reference ranges',
+        singular: 'analyte',
+        fields: [
+          { key: 'name', label: 'Analyte' },
+          { key: 'value', label: 'Value', width: 110 },
+          { key: 'unit', label: 'Unit', width: 100 },
+          { key: 'low', label: 'Ref. low', width: 100 },
+          { key: 'high', label: 'Ref. high', width: 100 },
+        ],
+      },
+    ],
+    defaults: { status: 'Ordered', result: '', test: 'CBC', lab: LABS[0], priority: 'Routine', sample: 'Blood', analytes: [], documents: [] },
     kpis: [
       { label: 'Orders', tone: 'indigo', compute: (r) => r.length.toString() },
-      { label: 'In Lab', tone: 'blue', compute: (r) => byStatus(r, 'In lab').toString() },
+      { label: 'Awaiting Sample', tone: 'violet', compute: (r) => byStatus(r, 'Ordered').toString() },
       { label: 'Abnormal', tone: 'rose', compute: (r) => byStatus(r, 'Abnormal').toString() },
-      { label: 'Approved', tone: 'green', compute: (r) => byStatus(r, 'Approved').toString() },
+      { label: 'Released', tone: 'green', compute: (r) => byStatus(r, 'Approved').toString() },
     ],
     actions: [
-      { key: 'approve', label: 'Approve', tone: 'green', when: (r) => r.status === 'Ready to approve' || r.status === 'Abnormal', patch: () => ({ status: 'Approved' }), toast: 'Result approved & released' },
+      { key: 'approve', label: 'Approve', tone: 'green', when: (r) => r.status === 'Ready to approve' || r.status === 'Abnormal', patch: () => ({ status: 'Approved', reportedAt: Date.now() }), toast: 'Result approved & released' },
     ],
     seed: [
-      { resourceId: 'LAB-4471', test: 'CBC', patient: 'Anika Rahman', result: 'Hemoglobin low (9.1)', status: 'Abnormal' },
-      { resourceId: 'LAB-4468', test: 'Lipid Profile', patient: 'David Chen', result: 'Within range', status: 'Ready to approve' },
-      { resourceId: 'LAB-4465', test: 'HbA1c', patient: 'Meera Iyer', result: 'Elevated 8.2%', status: 'Abnormal' },
-      { resourceId: 'LAB-4460', test: 'Thyroid Panel', patient: 'Fatima Al-Sayed', result: 'Processing', status: 'In lab' },
-      { resourceId: 'LAB-4455', test: 'CBC', patient: 'James Okoro', result: 'Normal', status: 'Approved' },
+      { resourceId: 'LAB-4471', test: 'CBC', patient: 'Anika Rahman', doctor: 'Dr. Malik', lab: 'Metro Diagnostics Lab', priority: 'Urgent', sample: 'Blood', accession: 'ACC-4471', clinicalNote: 'Fatigue, exertional chest tightness', result: 'Haemoglobin low (9.1)', status: 'Abnormal', orderedAt: mins(600), collectedAt: mins(540), receivedAt: mins(510),
+        analytes: [
+          { name: 'Haemoglobin', value: '9.1', unit: 'g/dL', low: '12.0', high: '15.5' },
+          { name: 'WBC', value: '7.2', unit: '×10⁹/L', low: '4.0', high: '11.0' },
+          { name: 'Platelets', value: '240', unit: '×10⁹/L', low: '150', high: '400' },
+        ] },
+      { resourceId: 'LAB-4468', test: 'Lipid Profile', patient: 'David Chen', doctor: 'Dr. Rossi', lab: 'Respira Diagnostics', priority: 'Routine', sample: 'Blood', accession: 'ACC-4468', result: 'Within range', status: 'Ready to approve', orderedAt: mins(400), collectedAt: mins(360), receivedAt: mins(330),
+        analytes: [
+          { name: 'Total cholesterol', value: '4.6', unit: 'mmol/L', low: '0', high: '5.2' },
+          { name: 'LDL', value: '2.7', unit: 'mmol/L', low: '0', high: '3.4' },
+          { name: 'HDL', value: '1.4', unit: 'mmol/L', low: '1.0', high: '2.2' },
+        ] },
+      { resourceId: 'LAB-4465', test: 'HbA1c', patient: 'Meera Iyer', doctor: 'Dr. Nair', lab: 'Metro Diagnostics Lab', priority: 'Routine', sample: 'Blood', accession: 'ACC-4465', result: 'Elevated 8.2%', status: 'Abnormal', orderedAt: mins(1500), collectedAt: mins(1440), receivedAt: mins(1400),
+        analytes: [{ name: 'HbA1c', value: '8.2', unit: '%', low: '4.0', high: '5.6' }] },
+      { resourceId: 'LAB-4460', test: 'Thyroid Panel', patient: 'Fatima Al-Sayed', doctor: 'Dr. Bello', lab: 'Metro Diagnostics Lab', priority: 'Routine', sample: 'Blood', accession: 'ACC-4460', result: '', status: 'In lab', orderedAt: mins(300), collectedAt: mins(250), receivedAt: mins(230), analytes: [] },
+      { resourceId: 'LAB-4455', test: 'CBC', patient: 'James Okoro', doctor: 'Dr. Malik', lab: 'HeartCare Pathology', priority: 'Routine', sample: 'Blood', accession: 'ACC-4455', result: 'Normal', status: 'Approved', orderedAt: mins(3000), collectedAt: mins(2940), receivedAt: mins(2900), reportedAt: mins(2760), verifiedBy: 'Dr. T. Bello',
+        analytes: [{ name: 'Haemoglobin', value: '14.2', unit: 'g/dL', low: '13.0', high: '17.0' }] },
+      { resourceId: 'LAB-4452', test: 'Kidney Function', patient: 'Anika Rahman', doctor: 'Dr. Malik', lab: 'Metro Diagnostics Lab', priority: 'STAT', sample: 'Blood', accession: '', result: '', status: 'Ordered', orderedAt: mins(35), clinicalNote: 'Pre-contrast screen', analytes: [] },
+      { resourceId: 'LAB-4450', test: 'Chest X-ray', patient: 'David Chen', doctor: 'Dr. Rossi', lab: 'Respira Diagnostics', priority: 'Urgent', sample: 'Imaging', accession: 'ACC-4450', result: '', status: 'Sample collected', orderedAt: mins(120), collectedAt: mins(60), clinicalNote: 'COPD exacerbation follow-up', analytes: [] },
+      { resourceId: 'LAB-4447', test: 'Urinalysis', patient: 'Grace Wanjiru', doctor: 'Dr. Lin Wei', lab: 'Metro Diagnostics Lab', priority: 'Routine', sample: 'Urine', accession: '', result: '', status: 'Ordered', orderedAt: mins(90), analytes: [] },
     ],
   },
 
@@ -607,18 +734,23 @@ export const schemas = [
     columns: [
       { key: 'resourceId', label: 'ID', type: 'ref' },
       { key: 'name', label: 'Medicine', type: 'strong' },
+      { key: 'branch', label: 'Dispensary', filter: true },
       { key: 'batch', label: 'Batch' },
       { key: 'stock', label: 'Stock' },
       { key: 'status', label: 'Status', type: 'pill', filter: true },
     ],
     formFields: [
       { key: 'name', label: 'Medicine', type: 'text', required: true, full: true },
+      { key: 'generic', label: 'Generic name', type: 'text' },
+      { key: 'branch', label: 'Dispensary', type: 'select', options: PHARMACIES, required: true },
       { key: 'batch', label: 'Batch no.', type: 'text' },
       { key: 'stock', label: 'Stock qty', type: 'number', required: true },
+      { key: 'reorderLevel', label: 'Reorder level', type: 'number' },
+      { key: 'price', label: 'Unit price', type: 'text' },
       { key: 'expiry', label: 'Expiry', type: 'date' },
       { key: 'status', label: 'Status', type: 'select', options: ['In stock', 'Low stock', 'Expiring', 'Delivering'] },
     ],
-    defaults: { status: 'In stock', stock: 100 },
+    defaults: { status: 'In stock', stock: 100, reorderLevel: 50, branch: PHARMACIES[0] },
     kpis: [
       { label: 'SKUs', tone: 'mint', compute: (r) => r.length.toString() },
       { label: 'Low Stock', tone: 'amber', compute: (r) => byStatus(r, 'Low stock').toString() },
@@ -629,11 +761,19 @@ export const schemas = [
       { key: 'reorder', label: 'Reorder', tone: 'green', when: (r) => r.status === 'Low stock', patch: (r) => ({ status: 'In stock', stock: Number(r.stock) + 200 }), toast: 'Reorder raised (+200 units)' },
     ],
     seed: [
-      { resourceId: 'PH-8812', name: 'Atorvastatin 20mg', batch: 'B-4410', stock: 620, expiry: '2027-03-01', status: 'In stock' },
-      { resourceId: 'PH-8809', name: 'Metformin 850mg', batch: 'B-4388', stock: 40, expiry: '2027-01-15', status: 'Delivering' },
-      { resourceId: 'PH-8805', name: 'Amoxicillin 500mg', batch: 'B-2291', stock: 210, expiry: '2026-08-01', status: 'Expiring' },
-      { resourceId: 'PH-8800', name: 'Insulin Glargine', batch: 'B-4102', stock: 18, expiry: '2026-11-20', status: 'Low stock' },
-      { resourceId: 'PH-8795', name: 'Levothyroxine 75mcg', batch: 'B-4055', stock: 480, expiry: '2027-06-10', status: 'In stock' },
+      /* Expiries are relative too: the "expiring within 60 days" rule and the
+         precedence of expiry over quantity both need a shelf that is actually
+         near its date whenever the demo is opened. PH-8805 is deliberately
+         past it, PH-8786 deliberately close to it. */
+      { resourceId: 'PH-8812', name: 'Atorvastatin 20mg', generic: 'Atorvastatin', branch: 'Metro General Pharmacy', batch: 'B-4410', stock: 620, reorderLevel: 120, price: '$0.35', expiry: day(210), status: 'In stock' },
+      { resourceId: 'PH-8809', name: 'Metformin 850mg', generic: 'Metformin HCl', branch: 'City Care Pharmacy', batch: 'B-4388', stock: 40, reorderLevel: 100, price: '$0.18', expiry: day(160), status: 'Delivering' },
+      { resourceId: 'PH-8805', name: 'Amoxicillin 500mg', generic: 'Amoxicillin', branch: 'Metro General Pharmacy', batch: 'B-2291', stock: 210, reorderLevel: 80, price: '$0.44', expiry: day(-5), status: 'Expiring' },
+      { resourceId: 'PH-8800', name: 'Insulin Glargine', generic: 'Insulin glargine', branch: 'Metro General Pharmacy', batch: 'B-4102', stock: 18, reorderLevel: 40, price: '$21.00', expiry: day(105), status: 'Low stock' },
+      { resourceId: 'PH-8795', name: 'Levothyroxine 75mcg', generic: 'Levothyroxine sodium', branch: 'City Care Pharmacy', batch: 'B-4055', stock: 480, reorderLevel: 100, price: '$0.12', expiry: day(300), status: 'In stock' },
+      { resourceId: 'PH-8790', name: 'Bisoprolol 5mg', generic: 'Bisoprolol fumarate', branch: 'Metro General Pharmacy', batch: 'B-4520', stock: 340, reorderLevel: 90, price: '$0.21', expiry: day(390), status: 'In stock' },
+      { resourceId: 'PH-8786', name: 'Salbutamol inhaler', generic: 'Salbutamol', branch: 'HeartCare Dispensary', batch: 'B-3311', stock: 26, reorderLevel: 30, price: '$6.80', expiry: day(38), status: 'Expiring' },
+      { resourceId: 'PH-8782', name: 'Warfarin 5mg', generic: 'Warfarin sodium', branch: 'Metro General Pharmacy', batch: 'B-4601', stock: 155, reorderLevel: 60, price: '$0.16', expiry: day(280), status: 'In stock' },
+      { resourceId: 'PH-8778', name: 'Ferrous sulfate 200mg', generic: 'Ferrous sulfate', branch: 'HeartCare Dispensary', batch: 'B-4210', stock: 410, reorderLevel: 100, price: '$0.09', expiry: day(360), status: 'In stock' },
     ],
   },
 
@@ -714,6 +854,141 @@ export const schemas = [
     ],
   },
 
+  /* --------------------------------------------------------- Admissions */
+  {
+    key: 'admissions',
+    label: 'Admissions',
+    icon: ClipboardPlus,
+    accent: accents.sky,
+    tagline: 'In-patient Admissions',
+    desc: 'Admission, ward and bed assignment, transfers and discharge.',
+    entity: 'Admission',
+    idPrefix: 'ADM',
+    /* Bed *capacity* counts and *who is in which bed* are different questions.
+       Capacity answers "is there room"; this answers "where is Mr Chen". The
+       two are kept apart on purpose — an admission that silently decremented
+       a capacity row would double-count against the manual Admit action. */
+    statusTones: { Admitted: 'blue', Observation: 'amber', 'For discharge': 'violet', Discharged: 'green', Transferred: 'teal' },
+    columns: [
+      { key: 'resourceId', label: 'ID', type: 'ref' },
+      { key: 'patient', label: 'Patient', type: 'strong' },
+      { key: 'hospital', label: 'Facility', filter: true },
+      { key: 'unit', label: 'Ward / unit', filter: true },
+      { key: 'bed', label: 'Bed' },
+      { key: 'doctor', label: 'Consultant', filter: true },
+      { key: 'status', label: 'Status', type: 'pill', filter: true },
+    ],
+    formFields: [
+      { key: 'patient', label: 'Patient', type: 'text', required: true, full: true },
+      { key: 'hospital', label: 'Facility', type: 'text', required: true, full: true },
+      { key: 'unit', label: 'Ward / unit', type: 'select', options: [...CARE_UNITS, 'General ward', 'Maternity', 'Surgical ward'] },
+      { key: 'bed', label: 'Bed no.', type: 'text' },
+      { key: 'doctor', label: 'Consultant', type: 'text' },
+      { key: 'admittedOn', label: 'Admitted on', type: 'date' },
+      { key: 'diagnosis', label: 'Admitting diagnosis', type: 'text', full: true },
+      { key: 'payer', label: 'Payer', type: 'select', options: ['Self-pay', 'Insurance', 'Corporate', 'Government scheme'] },
+      { key: 'status', label: 'Status', type: 'select', options: ['Admitted', 'Observation', 'For discharge', 'Discharged', 'Transferred'] },
+    ],
+    defaults: { status: 'Admitted', unit: 'General ward', payer: 'Self-pay' },
+    kpis: [
+      { label: 'In-patients', tone: 'sky', compute: (r) => byStatus(r, 'Admitted', 'Observation', 'For discharge').toString() },
+      { label: 'For Discharge', tone: 'violet', compute: (r) => byStatus(r, 'For discharge').toString() },
+      { label: 'Under Observation', tone: 'amber', compute: (r) => byStatus(r, 'Observation').toString() },
+      { label: 'Discharged', tone: 'green', compute: (r) => byStatus(r, 'Discharged').toString() },
+    ],
+    actions: [
+      { key: 'flag', label: 'Mark for discharge', tone: 'violet', when: (r) => r.status === 'Admitted' || r.status === 'Observation', patch: () => ({ status: 'For discharge' }), toast: 'Flagged for discharge planning' },
+      { key: 'discharge', label: 'Discharge', tone: 'green', when: (r) => r.status === 'For discharge', patch: () => ({ status: 'Discharged', dischargedAt: Date.now() }), toast: 'Patient discharged — bed released' },
+    ],
+    seed: [
+      { resourceId: 'ADM-2201', patient: 'David Chen', hospital: 'Metro General Hospital', unit: 'ICU', bed: 'ICU-04', doctor: 'Dr. Rossi', admittedOn: day(-4), diagnosis: 'COPD exacerbation', payer: 'Insurance', status: 'For discharge' },
+      { resourceId: 'ADM-2198', patient: 'Anika Rahman', hospital: 'Metro General Hospital', unit: 'CCU (cardiac)', bed: 'CCU-02', doctor: 'Dr. Malik', admittedOn: day(-2), diagnosis: 'Unstable angina', payer: 'Insurance', status: 'Admitted' },
+      { resourceId: 'ADM-2194', patient: 'Fatima Al-Sayed', hospital: 'NeuroCare Center', unit: 'HDU (high dependency)', bed: 'HDU-01', doctor: 'Dr. Farah', admittedOn: day(-3), diagnosis: 'Status migrainosus', payer: 'Self-pay', status: 'Observation' },
+      { resourceId: 'ADM-2190', patient: 'James Okoro', hospital: 'Metro General Hospital', unit: 'General ward', bed: 'GW-17', doctor: 'Dr. Malik', admittedOn: day(-8), diagnosis: 'Hyperglycaemia', payer: 'Corporate', status: 'Discharged', dischargedAt: mins(2880) },
+      { resourceId: 'ADM-2186', patient: 'Grace Wanjiru', hospital: 'SkinHealth Clinic', unit: 'Isolation', bed: 'ISO-01', doctor: 'Dr. Lin Wei', admittedOn: day(-1), diagnosis: 'Severe cellulitis', payer: 'Insurance', status: 'Admitted' },
+    ],
+  },
+
+  /* -------------------------------------------------------- Departments */
+  {
+    key: 'departments',
+    label: 'Departments',
+    icon: Network,
+    accent: accents.teal,
+    tagline: 'Departments & Services',
+    desc: 'Clinical departments, service catalogue, heads of unit and tariffs.',
+    entity: 'Department',
+    idPrefix: 'DEP',
+    statusTones: { Open: 'green', 'Limited service': 'amber', Closed: 'rose' },
+    columns: [
+      { key: 'resourceId', label: 'ID', type: 'ref' },
+      { key: 'name', label: 'Department', type: 'strong' },
+      { key: 'hospital', label: 'Facility', filter: true },
+      { key: 'head', label: 'Head of unit' },
+      { key: 'phone', label: 'Extension' },
+      { key: 'status', label: 'Status', type: 'pill', filter: true },
+    ],
+    formFields: [
+      { key: 'name', label: 'Department', type: 'text', required: true, full: true },
+      { key: 'hospital', label: 'Facility', type: 'text', required: true, full: true },
+      { key: 'head', label: 'Head of unit', type: 'text' },
+      { key: 'phone', label: 'Extension', type: 'text' },
+      { key: 'status', label: 'Status', type: 'select', options: ['Open', 'Limited service', 'Closed'] },
+      { key: 'notes', label: 'Notes', type: 'textarea', full: true },
+    ],
+    /* The tariff is a department property, not a doctor's fee: an X-ray
+       costs the same whoever requested it. Billing reads these. */
+    subforms: [
+      {
+        key: 'services',
+        label: 'Service catalogue',
+        singular: 'service',
+        fields: [
+          { key: 'name', label: 'Service' },
+          { key: 'code', label: 'Code', width: 110 },
+          { key: 'price', label: 'Tariff', width: 110 },
+        ],
+      },
+    ],
+    defaults: { status: 'Open', services: [] },
+    kpis: [
+      { label: 'Departments', tone: 'teal', compute: (r) => r.length.toString() },
+      { label: 'Open', tone: 'green', compute: (r) => byStatus(r, 'Open').toString() },
+      { label: 'Limited', tone: 'amber', compute: (r) => byStatus(r, 'Limited service').toString() },
+      { label: 'Services', tone: 'blue', compute: (r) => r.reduce((n, x) => n + (x.services?.length || 0), 0).toString() },
+    ],
+    actions: [
+      { key: 'open', label: 'Reopen', tone: 'green', when: (r) => r.status !== 'Open', patch: () => ({ status: 'Open' }), toast: 'Department reopened' },
+    ],
+    seed: [
+      { resourceId: 'DEP-011', name: 'Cardiology', hospital: 'Metro General Hospital', head: 'Dr. Sara Malik', phone: 'x2201', status: 'Open',
+        services: [
+          { name: 'Consultation — cardiology', code: 'CARD-01', price: '$120' },
+          { name: 'Echocardiogram', code: 'CARD-14', price: '$180' },
+          { name: 'Exercise tolerance test', code: 'CARD-22', price: '$210' },
+        ] },
+      { resourceId: 'DEP-012', name: 'Endocrinology', hospital: 'Metro General Hospital', head: 'Dr. Priya Nair', phone: 'x2210', status: 'Open',
+        services: [
+          { name: 'Consultation — endocrinology', code: 'ENDO-01', price: '$110' },
+          { name: 'Diabetes education session', code: 'ENDO-08', price: '$45' },
+        ] },
+      { resourceId: 'DEP-013', name: 'Radiology', hospital: 'Metro Imaging Center', head: 'Dr. Tunde Bello', phone: 'x3300', status: 'Open',
+        services: [
+          { name: 'Chest X-ray', code: 'RAD-02', price: '$60' },
+          { name: 'CT head (non-contrast)', code: 'RAD-31', price: '$320' },
+        ] },
+      { resourceId: 'DEP-014', name: 'Pulmonology', hospital: 'Respira Clinic', head: 'Dr. Marco Rossi', phone: 'x4110', status: 'Open',
+        services: [
+          { name: 'Consultation — pulmonology', code: 'PULM-01', price: '$100' },
+          { name: 'Spirometry', code: 'PULM-05', price: '$70' },
+        ] },
+      { resourceId: 'DEP-015', name: 'Emergency', hospital: 'Metro General Hospital', head: 'Unassigned', phone: 'x9999', status: 'Limited service', notes: 'Overnight cover by on-call rota only.',
+        services: [{ name: 'Emergency attendance', code: 'ED-01', price: '$150' }] },
+      { resourceId: 'DEP-016', name: 'Dermatology', hospital: 'SkinHealth Clinic', head: 'Dr. Lin Wei', phone: 'x5120', status: 'Open',
+        services: [{ name: 'Consultation — dermatology', code: 'DERM-01', price: '$80' }] },
+    ],
+  },
+
   /* ------------------------------------------------------------ Billing */
   {
     key: 'billing',
@@ -729,12 +1004,16 @@ export const schemas = [
       { key: 'resourceId', label: 'ID', type: 'ref' },
       { key: 'party', label: 'Bill to', type: 'strong' },
       { key: 'category', label: 'Category', filter: true },
+      { key: 'hospital', label: 'Facility', filter: true },
       { key: 'amount', label: 'Amount' },
       { key: 'status', label: 'Status', type: 'pill', filter: true },
     ],
     formFields: [
       { key: 'party', label: 'Bill to', type: 'text', required: true },
-      { key: 'category', label: 'Category', type: 'select', options: ['Consultation', 'Pharmacy', 'Laboratory', 'Insurance', 'Corporate'] },
+      { key: 'category', label: 'Category', type: 'select', options: ['Consultation', 'Pharmacy', 'Laboratory', 'Insurance', 'Corporate', 'In-patient'] },
+      { key: 'hospital', label: 'Facility', type: 'text', full: true },
+      { key: 'doctor', label: 'Attributed to', type: 'text' },
+      { key: 'date', label: 'Issued', type: 'date' },
       { key: 'amount', label: 'Amount', type: 'text', required: true },
       { key: 'status', label: 'Status', type: 'select', options: ['Due', 'Submitted', 'Paid', 'Fraud review', 'Overdue'] },
     ],
@@ -750,11 +1029,17 @@ export const schemas = [
       { key: 'clear', label: 'Clear flag', tone: 'blue', when: (r) => r.status === 'Fraud review', patch: () => ({ status: 'Submitted' }), toast: 'Fraud flag cleared' },
     ],
     seed: [
-      { resourceId: 'INV-2291', party: 'Anika Rahman', category: 'Consultation', amount: '$240', status: 'Submitted' },
-      { resourceId: 'INV-2288', party: 'David Chen', category: 'Laboratory', amount: '$88', status: 'Paid' },
-      { resourceId: 'CLM-1140', party: 'Meera Iyer', category: 'Insurance', amount: '$430', status: 'Fraud review' },
-      { resourceId: 'INV-2280', party: 'Acme Ltd', category: 'Corporate', amount: '$12,400', status: 'Due' },
-      { resourceId: 'INV-2275', party: 'James Okoro', category: 'Pharmacy', amount: '$54', status: 'Overdue' },
+      /* Spread across three months so the earnings and revenue charts have a
+         trend to show rather than a single bar. */
+      { resourceId: 'INV-2291', party: 'Anika Rahman', category: 'Consultation', hospital: 'Metro General Hospital', doctor: 'Dr. Malik', date: day(-1), amount: '$240', status: 'Submitted' },
+      { resourceId: 'INV-2288', party: 'David Chen', category: 'Laboratory', hospital: 'Respira Clinic', doctor: 'Dr. Rossi', date: day(-3), amount: '$88', status: 'Paid' },
+      { resourceId: 'CLM-1140', party: 'Meera Iyer', category: 'Insurance', hospital: 'Endo & Diabetes Clinic', doctor: 'Dr. Nair', date: day(-10), amount: '$430', status: 'Fraud review' },
+      { resourceId: 'INV-2280', party: 'Acme Ltd', category: 'Corporate', hospital: 'Metro General Hospital', date: day(-36), amount: '$12,400', status: 'Due' },
+      { resourceId: 'INV-2275', party: 'James Okoro', category: 'Pharmacy', hospital: 'Metro General Hospital', doctor: 'Dr. Malik', date: day(-44), amount: '$54', status: 'Overdue' },
+      { resourceId: 'INV-2270', party: 'David Chen', category: 'In-patient', hospital: 'Metro General Hospital', doctor: 'Dr. Rossi', date: day(-9), amount: '$3,180', status: 'Due' },
+      { resourceId: 'INV-2266', party: 'Anika Rahman', category: 'Consultation', hospital: 'Metro General Hospital', doctor: 'Dr. Malik', date: day(-58), amount: '$120', status: 'Paid' },
+      { resourceId: 'INV-2263', party: 'Anika Rahman', category: 'Consultation', hospital: 'Metro General Hospital', doctor: 'Dr. Malik', date: day(-25), amount: '$120', status: 'Paid' },
+      { resourceId: 'INV-2261', party: 'Grace Wanjiru', category: 'Consultation', hospital: 'SkinHealth Clinic', doctor: 'Dr. Lin Wei', date: day(0), amount: '$80', status: 'Due' },
     ],
   },
 
@@ -773,12 +1058,14 @@ export const schemas = [
     columns: [
       { key: 'resourceId', label: 'ID', type: 'ref' },
       { key: 'patient', label: 'Patient', type: 'strong' },
+      { key: 'doctor', label: 'Responsible', filter: true },
       { key: 'device', label: 'Device', filter: true },
       { key: 'reading', label: 'Reading' },
       { key: 'status', label: 'Status', type: 'pill', filter: true },
     ],
     formFields: [
       { key: 'patient', label: 'Patient', type: 'text', required: true },
+      { key: 'doctor', label: 'Responsible clinician', type: 'text' },
       { key: 'device', label: 'Device', type: 'select', options: ['Pulse oximeter', 'BP monitor', 'Glucose meter', 'ECG', 'Wearable', 'Smart scale'] },
       { key: 'reading', label: 'Latest reading', type: 'text' },
       { key: 'status', label: 'Status', type: 'select', options: ['Stable', 'Watch', 'High', 'Critical'] },
@@ -793,12 +1080,15 @@ export const schemas = [
     actions: [
       { key: 'ack', label: 'Acknowledge', tone: 'green', when: (r) => r.status === 'Critical' || r.status === 'High', patch: () => ({ status: 'Watch' }), toast: 'Alert acknowledged — care team notified' },
     ],
+    /* A monitored patient has a clinician responsible for the alert. Without
+       one, a critical reading arrives in nobody's queue — which is the exact
+       failure remote monitoring exists to prevent. */
     seed: [
-      { resourceId: 'RPM-3391', patient: 'Anika Rahman', device: 'Pulse oximeter', reading: 'SpO₂ 88%', status: 'Critical' },
-      { resourceId: 'RPM-3388', patient: 'James Okoro', device: 'BP monitor', reading: '168/104', status: 'High' },
-      { resourceId: 'RPM-3385', patient: 'Meera Iyer', device: 'Glucose meter', reading: '42 mg/dL', status: 'Critical' },
-      { resourceId: 'RPM-3380', patient: 'Fatima Al-Sayed', device: 'Wearable', reading: 'HR 118', status: 'Watch' },
-      { resourceId: 'RPM-3375', patient: 'David Chen', device: 'Smart scale', reading: '82 kg', status: 'Stable' },
+      { resourceId: 'RPM-3391', patient: 'Anika Rahman', doctor: 'Dr. Malik', device: 'Pulse oximeter', reading: 'SpO₂ 88%', status: 'Critical' },
+      { resourceId: 'RPM-3388', patient: 'James Okoro', doctor: 'Dr. Malik', device: 'BP monitor', reading: '168/104', status: 'High' },
+      { resourceId: 'RPM-3385', patient: 'Meera Iyer', doctor: 'Dr. Nair', device: 'Glucose meter', reading: '42 mg/dL', status: 'Critical' },
+      { resourceId: 'RPM-3380', patient: 'Fatima Al-Sayed', doctor: 'Dr. Bello', device: 'Wearable', reading: 'HR 118', status: 'Watch' },
+      { resourceId: 'RPM-3375', patient: 'David Chen', doctor: 'Dr. Rossi', device: 'Smart scale', reading: '82 kg', status: 'Stable' },
     ],
   },
 
@@ -940,5 +1230,10 @@ for (const s of schemas) {
   s.tiles = content[s.key]?.tiles || []
   s.feed = content[s.key]?.feed || []
 }
+
+/* Resolve the human-written names in the seeds into patient/doctor ids, so
+   every portal can scope by key rather than by string match. */
+import { linkSeeds } from './links.js'
+linkSeeds(schemas)
 
 export const schemaMap = Object.fromEntries(schemas.map((s) => [s.key, s]))

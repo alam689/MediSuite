@@ -24,6 +24,8 @@ import {
   Scan,
   BedDouble,
   PhoneCall,
+  ClipboardPlus,
+  Network,
 } from 'lucide-react'
 
 export const content = {
@@ -152,6 +154,34 @@ export const content = {
       { title: 'Delivery dispatched', sub: 'PH-8809 · PT-90410', minsAgo: 26 },
       { title: 'Expiry alert', sub: 'Batch B-2291 · 21 days', minsAgo: 48 },
       { title: 'Payment received', sub: 'PH-8801 · online', minsAgo: 95 },
+    ],
+  },
+  admissions: {
+    tiles: [
+      { icon: ClipboardPlus, title: 'Admit a Patient', desc: 'Assign a ward, unit and bed on arrival.', count: 'Admit', go: 'create' },
+      { icon: BedDouble, title: 'Ward Board', desc: 'Who is in which bed, right now.', count: 'Open board', go: 'records' },
+      { icon: ListChecks, title: 'Discharge Planning', desc: 'Flag, plan and complete discharges.', count: 'Review', go: 'records' },
+      { icon: Wallet, title: 'Payer & Coverage', desc: 'Self-pay, insurance and corporate cover.', count: 'View', go: 'records' },
+    ],
+    feed: [
+      { title: 'Patient admitted', sub: 'ADM-2186 · Isolation', minsAgo: 15 },
+      { title: 'Flagged for discharge', sub: 'ADM-2201 · ICU-04', minsAgo: 55 },
+      { title: 'Bed transfer', sub: 'ADM-2194 · HDU-01', minsAgo: 140 },
+      { title: 'Discharge completed', sub: 'ADM-2190 · GW-17', minsAgo: 2880 },
+    ],
+  },
+  departments: {
+    tiles: [
+      { icon: Network, title: 'Departments', desc: 'Clinical units, heads and contact extensions.', count: 'Add unit', go: 'create' },
+      { icon: ListChecks, title: 'Service Catalogue', desc: 'Every billable service and its tariff.', count: 'Manage', go: 'records' },
+      { icon: Stethoscope, title: 'Heads of Unit', desc: 'Accountable clinician for each department.', count: 'View', go: 'records' },
+      { icon: Wallet, title: 'Tariffs', desc: 'Pricing that billing and invoices read from.', count: 'Review', go: 'records' },
+    ],
+    feed: [
+      { title: 'Tariff updated', sub: 'RAD-31 · CT head', minsAgo: 40 },
+      { title: 'Department set to limited', sub: 'Emergency · overnight cover', minsAgo: 95 },
+      { title: 'Head of unit assigned', sub: 'Cardiology · Dr. Sara Malik', minsAgo: 200 },
+      { title: 'Service added', sub: 'PULM-05 · Spirometry', minsAgo: 320 },
     ],
   },
   billing: {

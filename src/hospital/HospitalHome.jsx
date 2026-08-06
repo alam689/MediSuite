@@ -7,60 +7,59 @@ import {
   ArrowRight,
   Clock,
   CheckCircle2,
+  ClipboardPlus,
+  Network,
+  Wallet,
 } from 'lucide-react'
-import { relTime } from '../store/DataStore.jsx'
 import { freeBeds } from '../data/schemas.js'
 import { useHospital } from './HospitalContext.jsx'
 import { prettyDate, upcoming } from '../patient/helpers.js'
+import { money, usd } from '../portal/format.js'
+import { hospitalNotifications } from '../portal/notifications.js'
 
 const STALE_MINUTES = 30
 
 export default function HospitalHome() {
-  const { facilityLabel, isAll, facilities, units, staff, appointments, unassigned } = useHospital()
+  const {
+    facilityLabel,
+    isAll,
+    facilities,
+    units,
+    staff,
+    appointments,
+    unassigned,
+    admissions,
+    departments,
+    invoices,
+  } = useHospital()
 
   const openUnits = units.filter((u) => u.status === 'Open')
   const freeTotal = openUnits.reduce((n, u) => n + freeBeds(u), 0)
   const bedTotal = units.reduce((n, u) => n + Number(u.total || 0), 0)
-  const fullUnits = openUnits.filter((u) => freeBeds(u) === 0)
   const stale = units.filter((u) => Date.now() - Number(u.updatedAt || 0) > STALE_MINUTES * 60000)
 
   const pending = appointments.filter((a) => a.status === 'Pending')
-  const urgent = appointments.filter((a) => a.status === 'Urgent')
   const next = upcoming(appointments).slice(0, 5)
 
-  /* Things a human must act on, worst first. Ordering this list by severity
-     is the page's actual job — anything below the fold is a thing that
-     didn't get done. */
-  /* In group view every item names its site — "CCU is full" means nothing
-     when you run seven clinics. */
-  const at = (site) => (isAll && site ? ` · ${site}` : '')
+  const inPatients = admissions.filter(
+    (a) => !['Discharged', 'Transferred'].includes(a.status)
+  )
+  const forDischarge = inPatients.filter((a) => a.status === 'For discharge')
+  const limited = departments.filter((d) => d.status !== 'Open')
 
-  const attention = [
-    ...urgent.map((a) => ({
-      tone: 'rose',
-      title: `Urgent appointment — ${a.patient}`,
-      sub: `${a.time} · ${a.doctor}${at(a.hospital)}`,
-      to: '/hospital/appointments',
-    })),
-    ...fullUnits.map((u) => ({
-      tone: 'rose',
-      title: `${u.unit} is full${at(u.hospital)}`,
-      sub: `0 of ${u.total} free — patients are being told this`,
-      to: '/hospital/beds',
-    })),
-    ...stale.map((u) => ({
-      tone: 'amber',
-      title: `${u.unit} count is ${relTime(u.updatedAt)}${at(u.hospital)}`,
-      sub: 'Patients see this as possibly out of date',
-      to: '/hospital/beds',
-    })),
-    ...pending.map((a) => ({
-      tone: 'blue',
-      title: `Appointment request — ${a.patient}`,
-      sub: `${prettyDate(a.date)} ${a.time} · ${a.doctor}${at(a.hospital)}`,
-      to: '/hospital/appointments',
-    })),
-  ]
+  /* Same list the bell shows, from the same builder. Ordering by severity
+     is the page's actual job — anything below the fold is a thing that
+     didn't get done — and the builder does it once for both. */
+  const attention = hospitalNotifications({
+    units,
+    appointments,
+    admissions,
+    departments,
+    invoices,
+    isAll,
+    staleMinutes: STALE_MINUTES,
+    freeBeds,
+  })
 
   return (
     <>
@@ -112,6 +111,49 @@ export default function HospitalHome() {
         </div>
         <div className="hs-card">
           <div className="hs-card-head">
+            <ClipboardPlus size={15} /> In-patients
+          </div>
+          <div className="hs-card-big">{inPatients.length}</div>
+          <div className="hs-card-line">
+            {forDischarge.length} ready for discharge
+          </div>
+          <Link to="/hospital/admissions" className="hs-card-link">
+            Ward board <ArrowRight size={13} />
+          </Link>
+        </div>
+        <div className="hs-card">
+          <div className="hs-card-head">
+            <Network size={15} /> Departments
+          </div>
+          <div className="hs-card-big">{departments.length}</div>
+          <div className="hs-card-line">
+            {limited.length ? `${limited.length} not fully open` : 'all open'}
+          </div>
+          <Link to="/hospital/departments" className="hs-card-link">
+            Manage <ArrowRight size={13} />
+          </Link>
+        </div>
+        <div className="hs-card">
+          <div className="hs-card-head">
+            <Wallet size={15} /> Collected
+          </div>
+          <div className="hs-card-big">
+            {usd(invoices.filter((i) => i.status === 'Paid').reduce((n, i) => n + money(i.amount), 0))}
+          </div>
+          <div className="hs-card-line">
+            {usd(
+              invoices
+                .filter((i) => i.status === 'Due' || i.status === 'Overdue')
+                .reduce((n, i) => n + money(i.amount), 0)
+            )}{' '}
+            outstanding
+          </div>
+          <Link to="/hospital/revenue" className="hs-card-link">
+            Revenue <ArrowRight size={13} />
+          </Link>
+        </div>
+        <div className="hs-card">
+          <div className="hs-card-head">
             <Clock size={15} /> Stale counts
           </div>
           <div className="hs-card-big">{stale.length}</div>
@@ -132,8 +174,8 @@ export default function HospitalHome() {
                 Nothing needs you right now.
               </p>
             )}
-            {attention.map((a, i) => (
-              <Link className="hs-row" key={i} to={a.to}>
+            {attention.map((a) => (
+              <Link className="hs-row" key={a.id} to={a.to}>
                 <span className={`hs-dot tone-${a.tone}`} />
                 <div>
                   <div className="hs-row-title">{a.title}</div>

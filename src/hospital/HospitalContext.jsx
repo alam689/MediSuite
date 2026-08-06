@@ -1,5 +1,6 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useMemo } from 'react'
 import { useData } from '../store/DataStore.jsx'
+import { useScopedIdentity } from '../auth/AuthContext.jsx'
 
 /* =====================================================================
    Which facility this hospital admin runs.
@@ -17,7 +18,6 @@ import { useData } from '../store/DataStore.jsx'
    ===================================================================== */
 
 const HospitalContext = createContext(null)
-const STORAGE_KEY = 'medisuite-facility'
 const DEFAULT_FACILITY = 'Metro General Hospital'
 
 /* Group view: every facility at once, for an admin who runs more than one
@@ -31,25 +31,16 @@ export const ALL_FACILITIES = '__all__'
 export function HospitalProvider({ children }) {
   const { records } = useData()
 
-  const [facility, setFacility] = useState(() => {
-    try {
-      return localStorage.getItem(STORAGE_KEY) || DEFAULT_FACILITY
-    } catch {
-      return DEFAULT_FACILITY
-    }
-  })
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, facility)
-    } catch {
-      /* ignore quota errors */
-    }
-  }, [facility])
+  /* The facility lives on the session: it is which organisation this admin
+     is acting for, which is an attribute of who they are signed in as. */
+  const [facility, setFacility] = useScopedIdentity('hospital', DEFAULT_FACILITY)
 
   const capacity = records('capacity')
   const doctors = records('doctors')
   const appointments = records('appointments')
+  const admissionRows = records('admissions')
+  const departmentRows = records('departments')
+  const invoiceRows = records('billing')
 
   /* Every facility known to the platform — a hospital is anywhere that has
      either critical-care units or a doctor's chamber. */
@@ -96,6 +87,38 @@ export function HospitalProvider({ children }) {
      that belongs to nobody's list is one nobody prepares for. */
   const unassigned = useMemo(() => appointments.filter((a) => !a.hospital), [appointments])
 
+  /* In-patients, departments and invoices, scoped the same way. Each keeps
+     the facility on the row so a group view can still name where a bed,
+     a department or a charge belongs. */
+  const admissions = useMemo(
+    () => (isAll ? admissionRows : admissionRows.filter((a) => a.hospital === facility)),
+    [admissionRows, facility, isAll]
+  )
+
+  const departments = useMemo(
+    () => (isAll ? departmentRows : departmentRows.filter((d) => d.hospital === facility)),
+    [departmentRows, facility, isAll]
+  )
+
+  const invoices = useMemo(
+    () => (isAll ? invoiceRows : invoiceRows.filter((i) => i.hospital === facility)),
+    [invoiceRows, facility, isAll]
+  )
+
+  /* Beds currently occupied by a named in-patient, per unit. The capacity
+     module counts beds; this says who is in them. They are allowed to
+     disagree — capacity is edited by hand — and the Admissions page shows
+     the discrepancy rather than papering over it. */
+  const occupancyByUnit = useMemo(() => {
+    const map = new Map()
+    for (const a of admissions) {
+      if (a.status === 'Discharged' || a.status === 'Transferred') continue
+      const key = `${a.hospital}|${a.unit}`
+      map.set(key, (map.get(key) || 0) + 1)
+    }
+    return map
+  }, [admissions])
+
   const api = useMemo(
     () => ({
       facility,
@@ -109,8 +132,26 @@ export function HospitalProvider({ children }) {
       chambersOf,
       appointments: facilityAppointments,
       unassigned,
+      admissions,
+      departments,
+      invoices,
+      occupancyByUnit,
     }),
-    [facility, facilities, isAll, units, staff, chambersOf, facilityAppointments, unassigned]
+    [
+      facility,
+      setFacility,
+      facilities,
+      isAll,
+      units,
+      staff,
+      chambersOf,
+      facilityAppointments,
+      unassigned,
+      admissions,
+      departments,
+      invoices,
+      occupancyByUnit,
+    ]
   )
 
   return <HospitalContext.Provider value={api}>{children}</HospitalContext.Provider>

@@ -33,24 +33,49 @@ The dev server honors a `PORT` env var if set, otherwise uses `5173`.
 
 ## What's included
 
-Three audiences, one data store:
+Six stakeholders, one data store. Each signs in to its own workspace and works the same
+records from its own side:
 
-- **Clinician workspace** (`/app`) — the 14-module suite below.
-- **Hospital admin** (`/hospital`) — one facility's beds, bookings and practitioners.
-- **Patient portal** (`/patient`) — the patient's own view of the same records.
+- **Patient** (`/patient`) — books, joins consultations, reads results, pays.
+- **Doctor** (`/doctor`) — own caseload: schedule, queue, notes, prescribing, lab orders, earnings.
+- **Hospital admin** (`/hospital`) — one facility's beds, admissions, bookings, practitioners,
+  departments and revenue.
+- **Pharmacy** (`/pharmacy`) — one dispensary's prescription queue, stock and deliveries.
+- **Laboratory** (`/lab`) — one lab's sample intake, bench worklist and reporting.
+- **Administrator** (`/app`) — the 16-module platform console below, unscoped.
 
-Pick the role on the login screen.
+Pick the role on the login screen. A **session** (`src/auth/AuthContext.jsx`) plus a
+`<RequireRole>` guard keeps each role in its own workspace — typing another portal's URL
+redirects to your own home. It is navigation, not authorization: the data still reaches the
+browser, and only a server can fix that (blueprint §9.3).
+
+### Work that crosses roles
+
+The point of one store is that a handoff is a single record changing state, not a copy:
+
+| Flow | Path |
+|---|---|
+| Prescription | doctor issues (with allergy/interaction check) → pharmacy verifies authenticity → dispenses, decrementing shelf stock → delivers → patient sees "Ready to collect" |
+| Lab order | doctor orders → lab logs the sample and accessions it → bench enters analytes → **abnormal is derived from reference ranges, not typed** → doctor releases to the patient |
+| Admission | hospital admits to a ward and bed → transfers → discharges; the ward board reconciles against the hand-maintained bed count and reports any disagreement |
+
+Every portal carries a **notification bell** showing what is waiting on that role, on every
+page rather than only its dashboard. Both the bell and the dashboard read the same builder in
+`src/portal/notifications.js`, so a badge count and a page can never disagree. "Unread" is
+tracked by item id, not by timestamp — most items are derived from record *state* and have no
+moment of creation, so a prescription that has been on hold for a week would otherwise light
+the bell up every session.
 
 - **Login** — split-panel auth shell (teal brand panel with module chips + elevated form card),
-  with a **role toggle** that routes to the clinician workspace or the patient portal.
+  with a **six-role toggle** that signs in and routes to that role's workspace.
 - **App shell** — 264px teal-gradient sidebar (collapsible to icon-only), glass topbar with
   search, theme toggle, reset-demo-data, notifications and profile.
 - **Dashboard** — greeting header, **live** 4-up KPI strip, module grid, and a priority
   worklist pulled live from the data store (RPM alerts, drug interactions, flagged claims,
   live consults).
-- **14 fully interactive modules** — Patients, Doctors, Telemedicine, Appointments, EMR/EHR,
-  Prescriptions, Laboratory, Pharmacy, **Bed Capacity**, Billing & Finance, Remote Monitoring,
-  AI Platform, Analytics, Administration.
+- **16 fully interactive modules** — Patients, Doctors, Telemedicine, Appointments, EMR/EHR,
+  Prescriptions, Laboratory, Pharmacy, Bed Capacity, **Admissions**, **Departments**,
+  Billing & Finance, Remote Monitoring, AI Platform, Analytics, Administration.
 
 ## Interactivity
 
@@ -261,13 +286,23 @@ client-side hiding is not authorization (§9.3).
 
 ```
 src/
-  main.jsx                 app entry (ThemeProvider → DataProvider → ToastProvider → Router)
-  App.jsx                  routes
+  main.jsx                 app entry (ThemeProvider → DataProvider → AuthProvider → ToastProvider → Router)
+  App.jsx                  routes; each portal's scoping provider mounts inside its own guarded route
   theme/ThemeContext.jsx   light/dark theme + persistence
   store/DataStore.jsx      CRUD data store + localStorage persistence
   styles/index.css         design tokens + base + shared utilities
+  auth/
+    AuthContext.jsx        the session: role, identity, sign in/out; useScopedIdentity()
+    RequireRole.jsx        route guard — no session → login, wrong role → your own home
+  portal/                                    shared frame for doctor / pharmacy / lab
+    PortalShell.jsx        brand, nav with badges, scope picker, sign-out, boundary footer
+    NotificationBell.jsx   the bell — used by all five portals, tracks unread by item id
+    notifications.js       "what needs you" per role, defined once; bell and dashboard both read it
+    format.js              money, turnaround, out-of-range, first name
+    portal.css             the `pf-` frame (one copy, not four)
   data/
     schemas.js             per-module interactive contract (columns, form, seed, KPIs, actions) — source of truth
+    links.js               resolves the seeds' human names into patient/doctor ids; refuses to guess when ambiguous
     moduleContent.js       Function tiles + initial Activity feed per module (merged into schemas)
     modules.js             slim nav view derived from schemas
   components/
@@ -288,10 +323,34 @@ src/
     TelemedicineConsole.jsx  AppointmentBooking.jsx  RpmMonitor.jsx
     ImagingStudio.jsx        WebGPU imaging viewer (Laboratory → Imaging Viewer)
     AIStudio.jsx  AnalyticsInsights.jsx  features.css
+  doctor/                                    doctor workspace (/doctor)
+    DoctorContext.jsx        the signed-in clinician; mine() and the patient panel
+    DoctorShell.jsx          nav with counts of work waiting on this doctor
+    DoctorHome.jsx           "what needs me now", ordered by cost of being late
+    DoctorSchedule.jsx  DoctorPatients.jsx  DoctorConsults.jsx
+    DoctorNotes.jsx          write / sign; a signed note is locked
+    DoctorPrescribe.jsx      allergy + interaction check before issue; override is recorded
+    DoctorLabs.jsx           order tests, review reports, release results to the patient
+    DoctorEarnings.jsx  DoctorProfile.jsx
+  pharmacy/                                  dispensary (/pharmacy)
+    PharmacyContext.jsx      branch scope; open / blocked / in-transit / closed buckets
+    PharmacyShell.jsx  PharmacyHome.jsx
+    PharmacyQueue.jsx        authenticity checks (no override), dispense, substitute, reject
+    PharmacyInventory.jsx    stock, reorder levels, expiry — expiry outranks quantity
+    PharmacyDeliveries.jsx   packed → dispatched → delivered
+  lab/                                       diagnostic centre (/lab)
+    LabContext.jsx           lab scope, stage buckets, STAT-first ordering
+    LabShell.jsx  LabHome.jsx
+    LabOrders.jsx            sample collection + accession, sample rejection
+    LabBench.jsx             analyte entry with reference ranges; abnormal is derived
+    LabReports.jsx           released reports + median turnaround
   hospital/                                  hospital admin desk (/hospital)
     HospitalContext.jsx      the one facility this admin runs; scopes every page
     HospitalShell.jsx        nav + always-visible facility scope
     HospitalHome.jsx  HospitalBeds.jsx  HospitalAppointments.jsx  HospitalStaff.jsx
+    HospitalAdmissions.jsx   ward board; reconciles against the hand-kept bed count
+    HospitalDepartments.jsx  departments, heads of unit, service catalogue & tariffs
+    HospitalRevenue.jsx      facility billing — collected and billed kept apart
     hospital.css
   patient/                                   patient portal (/patient)
     PatientContext.jsx       who is signed in; filters the shared store by patient
@@ -308,8 +367,18 @@ src/
 ## Notes
 
 - This is a **frontend demo build**: authentication and data are mocked. Any credentials on the
-  login screen continue to the dashboard. Wire the panels to the backend API
+  login screen continue to that role's workspace. Wire the panels to the backend API
   (Django + DRF per the product spec) to make it live.
+- **The role guard is not security.** It stops a user wandering into the wrong workspace; every
+  portal still filters records in the browser, which means the data was already sent. Real
+  authorization is the API refusing to answer (blueprint §9.3, §15.2). Three places state a
+  limitation rather than hide it, and each should be replaced before any real use: the
+  prescribing interaction check is a short demonstration list, not a drug database; prescription
+  validity is one constant for every drug class; laboratory reference ranges are illustrative
+  adult intervals rather than the analyser's own.
+- **Credential verification stays with the platform administrator.** A facility can onboard a
+  practitioner (Practitioners → Add) but cannot verify their own doctors' licences — that
+  separation is deliberate and predates this work.
 - To add a module: add an entry to `src/data/modules.js` (pick/extend a module accent) and it
   automatically appears in the sidebar with a fully-rendered module home. Primary actions stay teal.
 ```
