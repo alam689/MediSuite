@@ -31,7 +31,7 @@
   max-width: 1240px;
   margin: 0 auto;
   padding: 0 22px;
-  height: 64px;
+  min-height: 64px; /* grows when the nav wraps — never clip menu items */
   display: flex;
   align-items: center;
   gap: 16px;
@@ -68,14 +68,15 @@
   color: var(--tc, var(--primary));
   background: color-mix(in srgb, var(--tc, var(--primary)) 14%, transparent);
 }
+/* The nav must never hide entries: a portal with a long working day
+   (patient, doctor) wraps onto a second row rather than clipping links
+   behind the bell/avatar cluster. */
 .pf-nav {
   display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  flex-wrap: wrap;
   gap: 2px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.pf-nav::-webkit-scrollbar {
-  display: none;
 }
 .pf-nav-link {
   display: inline-flex;

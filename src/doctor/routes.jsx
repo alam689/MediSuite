@@ -7,6 +7,7 @@ import DoctorPatients from './DoctorPatients.jsx'
 import DoctorConsults from './DoctorConsults.jsx'
 import DoctorNotes from './DoctorNotes.jsx'
 import DoctorPrescribe from './DoctorPrescribe.jsx'
+import PrescriptionPad from './pad/PrescriptionPad.jsx'
 import DoctorLabs from './DoctorLabs.jsx'
 import DoctorEarnings from './DoctorEarnings.jsx'
 import DoctorProfile from './DoctorProfile.jsx'
@@ -26,6 +27,7 @@ export default function DoctorRoutes() {
           <Route path="consults" element={<DoctorConsults />} />
           <Route path="notes" element={<DoctorNotes />} />
           <Route path="prescriptions" element={<DoctorPrescribe />} />
+          <Route path="pad" element={<PrescriptionPad />} />
           <Route path="labs" element={<DoctorLabs />} />
           <Route path="earnings" element={<DoctorEarnings />} />
           <Route path="profile" element={<DoctorProfile />} />

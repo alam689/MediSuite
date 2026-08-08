@@ -245,9 +245,13 @@ p {
   color: var(--text-faint);
 }
 
-/* Entrance animation */
+/* Entrance animation. No fill mode: a forwards-filled transform (even the
+   identity matrix at the `to` keyframe) would permanently make the animated
+   element the containing block for every position:fixed overlay inside it,
+   so modals would center on the page instead of the viewport. The end state
+   equals the natural state, so dropping the fill changes nothing visually. */
 .fade-in {
-  animation: fadeIn 420ms ease both;
+  animation: fadeIn 420ms ease;
 }
 @keyframes fadeIn {
   from {
@@ -256,7 +260,7 @@ p {
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: none;
   }
 }
 
