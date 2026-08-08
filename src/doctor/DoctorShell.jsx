@@ -2,12 +2,13 @@ import { Link } from 'react-router-dom'
 import {
   LayoutGrid,
   CalendarClock,
-  Users,
   Video,
   FileText,
   Pill,
   FlaskConical,
   Wallet,
+  BarChart3,
+  BookUser,
   ShieldCheck,
 } from 'lucide-react'
 import PortalShell from '../portal/PortalShell.jsx'
@@ -50,12 +51,13 @@ export default function DoctorShell() {
   const nav = [
     { to: '/doctor', end: true, icon: LayoutGrid, label: 'Today' },
     { to: '/doctor/schedule', icon: CalendarClock, label: 'Schedule' },
-    { to: '/doctor/patients', icon: Users, label: 'My patients' },
+    { to: '/doctor/rx-patients', icon: BookUser, label: 'Patient list' },
     { to: '/doctor/consults', icon: Video, label: 'Consults', badge: waiting },
     { to: '/doctor/notes', icon: FileText, label: 'Notes', badge: unsigned },
     { to: '/doctor/prescriptions', icon: Pill, label: 'Prescriptions', badge: refills },
     { to: '/doctor/labs', icon: FlaskConical, label: 'Lab orders', badge: results },
     { to: '/doctor/earnings', icon: Wallet, label: 'Earnings' },
+    { to: '/doctor/reports', icon: BarChart3, label: 'Reports' },
   ]
 
   return (

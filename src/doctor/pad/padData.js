@@ -83,43 +83,82 @@ export const DOSES = ['১+০+১', '১+০+০', '০+০+১', '১+১+১'
 export const TIMINGS = ['খাবার পরে', 'খাবার আগে', 'ভরা পেটে', 'খালি পেটে', 'রাতে শোবার আগে']
 export const DURATIONS = ['৩ দিন', '৭ দিন', '১০ দিন', '১৫ দিন', '১ মাস', '২ মাস', '৩ মাস', '৬ মাস', 'চলবে']
 
+/* Medicine Remarks master (the timing/instruction phrases). Kept as its own
+   scored list — the picker's timing dropdown and the Preset Data settings
+   page both read it; TIMINGS above remains only the factory fallback. */
+let rid = 0
+const R = (text, score = 0) => ({ id: `r${++rid}`, text, score })
+export const SEED_REMARKS = [
+  R('ভরা পেটে', 3034),
+  R('খাবার পরে', 2323),
+  R('খাওয়ার আগে', 2170),
+  R('খাওয়ার ৩০ মিনিট আগে', 1837),
+  R('প্রতি সপ্তাহে ১টা করে ৮ সপ্তাহ', 588),
+  R('খালি পেটে', 531),
+  R('রাতে শোবার আগে', 246),
+  R('প্রয়োজনে', 120),
+]
+
+/* score: how often the prescriber has used the item — the pickers rank by
+   it, mirroring the reference app's "Score" column. presets: alternative
+   dosage suggestions; the medicine's own dose/timing/duration fields are
+   the current default ("Make Default" rewrites them from a preset). */
 let mid = 0
-const M = (brand, strength, form, generic = '') => ({
+const M = (brand, strength, form, generic = '', company = '', score = 0) => ({
   id: `m${++mid}`,
   brand,
   strength,
   form,
   generic,
+  company,
+  score,
+  hidden: false,
+  presets: [],
   dose: '১+০+১',
   timing: 'খাবার পরে',
   duration: 'চলবে',
 })
 
 export const SEED_MEDICINES = [
-  M('Ecosprin Plus', '75 mg + 75 mg', 'Tablet', 'Aspirin + Clopidogrel'),
-  M('Ecosprin', '75 mg', 'Tablet (Enteric Coated)', 'Aspirin'),
-  M('Lopirel Plus', '75 mg + 75 mg', 'Tablet', 'Clopidogrel + Aspirin'),
-  M('Linatab E', '5/10', 'Tablet', 'Linagliptin + Empagliflozin'),
-  M('Clopid-AS', '75 mg + 75 mg', 'Tablet', 'Clopidogrel + Aspirin'),
-  M('Lopirel', '75 mg', 'Tablet', 'Clopidogrel'),
-  M('Clopid', '75 mg', 'Tablet', 'Clopidogrel'),
-  M('NITRIN SR', '2.6 MG', 'Tablet', 'Nitroglycerin'),
-  M('Rostab', '10 mg', 'Tablet', 'Rosuvastatin'),
-  M('Rocovas', '10 mg', 'Tablet', 'Rosuvastatin'),
-  M('Rostab', '20 mg', 'Tablet', 'Rosuvastatin'),
-  M('Rostab', '5 mg', 'Tablet', 'Rosuvastatin'),
-  M('Pantonix', '20 mg', 'Tablet', 'Pantoprazole'),
-  M('Bislol', '2.5 mg', 'Tablet', 'Bisoprolol'),
-  M('Nidocard Retard', '2.6 mg', 'Tablet', 'Nitroglycerin'),
-  M('Sitagil M', '50 mg + 500 mg', 'Tablet (Extended Release)', 'Sitagliptin + Metformin'),
-  M('Sabitar', '24 mg + 26 mg', 'Tablet', 'Sacubitril + Valsartan'),
-  M('Metacard MR', '35 mg', 'Tablet (Modified Release)', 'Trimetazidine'),
-  M('Metazine MR', '35 mg', 'Tablet (Modified Release)', 'Trimetazidine'),
-  M('Efodio', '10 mg', 'Tablet', 'Empagliflozin'),
-  M('Carva', '75 mg', 'Tablet (Enteric Coated)', 'Aspirin'),
-  M('Remmo', '20 mg', 'Tablet', 'Rivaroxaban'),
-  M('Trocer SR', '2.6 mg', 'Tablet (Sustained Release)', 'Nitroglycerin'),
-  M('Dexlan', '30 mg', 'Capsule (Delayed Release)', 'Dexlansoprazole'),
+  M('Ecosprin Plus', '75 mg + 75 mg', 'Tablet', 'Aspirin + Clopidogrel', 'Acme Laboratories Limited.', 1180),
+  M('Ecosprin', '75 mg', 'Tablet (Enteric Coated)', 'Aspirin', 'Acme Laboratories Limited.', 1083),
+  M('Lopirel Plus', '75 mg + 75 mg', 'Tablet', 'Clopidogrel + Aspirin', 'Incepta Pharmaceuticals Limited', 1076),
+  M('Linatab E', '5/10', 'Tablet', 'Linagliptin + Empagliflozin', 'Beximco Pharmaceuticals Ltd.', 640),
+  M('Clopid-AS', '75 mg + 75 mg', 'Tablet', 'Clopidogrel + Aspirin', 'Drug International Ltd.', 610),
+  M('Lopirel', '75 mg', 'Tablet', 'Clopidogrel', 'Incepta Pharmaceuticals Limited', 560),
+  M('Clopid', '75 mg', 'Tablet', 'Clopidogrel', 'Drug International Ltd.', 520),
+  M('NITRIN SR', '2.6 MG', 'Tablet', 'Nitroglycerin', 'Square Pharmaceuticals Ltd.', 505),
+  M('Rostab', '10 mg', 'Tablet', 'Rosuvastatin', 'Renata Limited', 480),
+  M('Rocovas', '10 mg', 'Tablet', 'Rosuvastatin', 'Square Pharmaceuticals Ltd.', 455),
+  M('Rostab', '20 mg', 'Tablet', 'Rosuvastatin', 'Renata Limited', 430),
+  M('Rostab', '5 mg', 'Tablet', 'Rosuvastatin', 'Renata Limited', 410),
+  M('Pantonix', '20 mg', 'Tablet', 'Pantoprazole', 'Incepta Pharmaceuticals Limited', 395),
+  M('Bislol', '2.5 mg', 'Tablet', 'Bisoprolol', 'Drug International Ltd.', 360),
+  M('Nidocard Retard', '2.6 mg', 'Tablet', 'Nitroglycerin', 'Techno Drugs Ltd.', 340),
+  M('Sitagil M', '50 mg + 500 mg', 'Tablet (Extended Release)', 'Sitagliptin + Metformin', 'Incepta Pharmaceuticals Limited', 310),
+  M('Sabitar', '24 mg + 26 mg', 'Tablet', 'Sacubitril + Valsartan', 'Incepta Pharmaceuticals Limited', 290),
+  M('Metacard MR', '35 mg', 'Tablet (Modified Release)', 'Trimetazidine', 'Drug International Ltd.', 270),
+  M('Metazine MR', '35 mg', 'Tablet (Modified Release)', 'Trimetazidine', 'Opsonin Pharma Limited', 240),
+  M('Efodio', '10 mg', 'Tablet', 'Empagliflozin', 'Beximco Pharmaceuticals Ltd.', 220),
+  M('Carva', '75 mg', 'Tablet (Enteric Coated)', 'Aspirin', 'Square Pharmaceuticals Ltd.', 200),
+  M('Remmo', '20 mg', 'Tablet', 'Rivaroxaban', 'Beximco Pharmaceuticals Ltd.', 170),
+  M('Trocer SR', '2.6 mg', 'Tablet (Sustained Release)', 'Nitroglycerin', 'Aristopharma Ltd.', 150),
+  M('Dexlan', '30 mg', 'Capsule (Delayed Release)', 'Dexlansoprazole', 'Incepta Pharmaceuticals Limited', 130),
+]
+
+/* A few dosage suggestion presets so the settings page's "User Suggestion"
+   panel and the picker's preset menu are not empty on first run. */
+SEED_MEDICINES[0].dose = '০+১+০'
+SEED_MEDICINES[0].defaultPresetId = 'p1'
+SEED_MEDICINES[0].presets = [
+  { id: 'p1', dose: '০+১+০', timing: 'একসাথে একবার ভরা পেটে', duration: 'চলবে' },
+  { id: 'p2', dose: '০+১+০', timing: 'খাওয়ার পরে', duration: '১ মাস' },
+  { id: 'p3', dose: '১+০+১', timing: 'খাওয়ার পরে', duration: '১ মাস' },
+  { id: 'p4', dose: '০+১+০', timing: 'ভরা পেটে', duration: 'চলবে' },
+]
+SEED_MEDICINES[12].presets = [
+  { id: 'p5', dose: '১+০+১', timing: 'খাওয়ার ৩০ মিনিট আগে', duration: '১ মাস' },
+  { id: 'p6', dose: '০+০+১', timing: 'খাওয়ার আগে', duration: 'চলবে' },
 ]
 
 export const SEED_MEDICINE_GROUPS = [
@@ -129,7 +168,7 @@ export const SEED_MEDICINE_GROUPS = [
 
 /* ---- Generic section master lists -------------------------------------- */
 let iid = 0
-const I = (text, subs = []) => ({ id: `i${++iid}`, text, subs })
+const I = (text, subs = [], score = 0) => ({ id: `i${++iid}`, text, subs, score })
 
 export const SEED_MASTER = {
   presenting: [
@@ -223,10 +262,13 @@ export const SEED_MASTER = {
     I('Device therapy evaluation'),
   ],
   advice: [
-    I('Continue all previous medications'),
-    I('Stop smoking completely'),
-    I('Salt restricted diet'),
-    I('Review with all reports'),
+    I('CORONARY ANGIOGRAM', ['RENAL PACKAGE', 'PTCA ( IF NEEDED, Y)'], 48),
+    I('ECHO', [], 15),
+    I('CABG', ['Patient refused'], 13),
+    I('Continue all previous medications', [], 9),
+    I('Stop smoking completely', [], 6),
+    I('Salt restricted diet', [], 4),
+    I('Review with all reports', [], 2),
   ],
   upodesh: [
     I('শাক সবজি, ফলমূল, ইসবগুলের ভুষি খাবেন'),
@@ -241,13 +283,14 @@ export const SEED_MASTER = {
     I('ধূমপান ও তামাক জাতীয় দ্রব্য সম্পূর্ণ নিষেধ'),
   ],
   followup: [
-    I('১৫ দিন পর সকল রিপোর্টসহ দেখা করবেন।'),
-    I('১৫ দিন পর দেখা করবেন।'),
-    I('৭ দিন পর দেখা করবেন।'),
-    I('৩ মাস পর দেখা করবেন।'),
-    I('৩০ দিন পর সকল রিপোর্টসহ দেখা করবেন।'),
-    I('১ মাস পর দেখা করবেন।'),
-    I('সকল রিপোর্টসহ দেখা করবেন।'),
+    I('১৫ দিন পর সকল রিপোর্টসহ দেখা করবেন।', [], 89),
+    I('১৫ দিন পর দেখা করবেন।', [], 12),
+    I('৭ দিন পর দেখা করবেন।', [], 8),
+    I('পরবর্তী চিকিৎসার জন্য গ্যাস্ট্রোএন্টেরোলজিস্ট ডাঃ মোস্তফা নুর মহসিন স্যারের ৩০৪ নং রুমে যোগাযোগ করবেন।', [], 3),
+    I('৩ মাস পর দেখা করবেন।', [], 3),
+    I('৩০ দিন পর সকল রিপোর্টসহ দেখা করবেন।', [], 2),
+    I('১ মাস পর দেখা করবেন।', [], 2),
+    I('সকল রিপোর্টসহ দেখা করবেন।', [], 1),
     I('ব্যাথা বাড়লে আসবেন'),
     I('জ্বর বাড়লে আসবেন'),
     I('টেস্ট রিপোট নিয়ে আসবেন'),

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Search, ChevronDown, CalendarDays } from 'lucide-react'
 import { usePad } from './PadContext.jsx'
 import { useToast } from '../../components/ui/Toast.jsx'
-import { DOSES, TIMINGS, DURATIONS, medPrefix, padId, toBn } from './padData.js'
+import { DOSES, DURATIONS, medPrefix, padId, toBn } from './padData.js'
 
 /* Floating picker panel, positioned near the "+" that opened it and clamped
    to the viewport. Click outside closes. */
@@ -80,15 +80,27 @@ function GenericPicker({ sec }) {
   const secGroups = groups[sec.key] || []
   const selected = rx.items[sec.key] || []
 
+  /* Hidden items stay in the master (the settings page can unhide them) but
+     never appear here; the rest rank by usage score, most-used first. */
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase()
-    return s ? items.filter((i) => i.text.toLowerCase().includes(s)) : items
+    const visible = items.filter((i) => !i.hidden)
+    const list = s ? visible.filter((i) => i.text.toLowerCase().includes(s)) : visible
+    return [...list].sort((a, b) => (b.score || 0) - (a.score || 0))
   }, [q, items])
+
+  /* Every pick counts toward the item's score — that is what keeps the
+     frequently used phrases at the top of the list. */
+  const bump = (item) =>
+    setMaster((m) => ({
+      ...m,
+      [sec.key]: (m[sec.key] || []).map((i) => (i.id === item.id ? { ...i, score: (i.score || 0) + 1 } : i)),
+    }))
 
   const addMaster = () => {
     const text = q.trim()
     if (!text) return
-    const item = { id: padId('i'), text, subs: [] }
+    const item = { id: padId('i'), text, subs: [], score: 1 }
     setMaster((m) => ({ ...m, [sec.key]: [...(m[sec.key] || []), item] }))
     addItem(sec.key, { text })
     setQ('')
@@ -144,14 +156,14 @@ function GenericPicker({ sec }) {
             <Chip
               key={item.id}
               label={item.text}
-              onPick={() => addItem(sec.key, { text: item.text })}
+              onPick={() => { addItem(sec.key, { text: item.text }); bump(item) }}
               menu={(close) => (
                 <>
                   {item.subs?.map((s) => (
                     <button
                       key={s}
                       className="cm-item"
-                      onClick={() => { addItem(sec.key, { text: item.text, note: s }); close() }}
+                      onClick={() => { addItem(sec.key, { text: item.text, note: s }); bump(item); close() }}
                     >
                       {item.text} — {s}
                     </button>
@@ -227,7 +239,7 @@ function GenericPicker({ sec }) {
 /* ------------------------------------------------------------------ */
 function MedicinePicker({ sec }) {
   const toast = useToast()
-  const { medicines, setMedicines, medGroups, setMedGroups, rx, addItem, removeItem, patchItem } = usePad()
+  const { medicines, setMedicines, medGroups, setMedGroups, remarks, rx, addItem, removeItem, patchItem } = usePad()
   const [q, setQ] = useState('')
   const [tab, setTab] = useState('meds')
   const [sort, setSort] = useState('brand')
@@ -235,33 +247,47 @@ function MedicinePicker({ sec }) {
 
   const selected = rx.items[sec.key] || []
 
+  /* Usage score ranks first (the working formulary floats to the top); the
+     brand/generic select only breaks ties. Hidden medicines never appear. */
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase()
-    let list = medicines
+    let list = medicines.filter((m) => !m.hidden)
     if (s) list = list.filter((m) => `${m.brand} ${m.generic} ${m.strength}`.toLowerCase().includes(s))
     return [...list].sort((a, b) =>
-      sort === 'brand' ? a.brand.localeCompare(b.brand) : (a.generic || '').localeCompare(b.generic || '')
+      (b.score || 0) - (a.score || 0) ||
+      (sort === 'brand' ? a.brand.localeCompare(b.brand) : (a.generic || '').localeCompare(b.generic || ''))
     )
   }, [q, medicines, sort])
 
+  /* Timing options come from the scored Medicine Remarks master. */
+  const timingOptions = useMemo(
+    () => remarks.filter((r) => !r.hidden).sort((a, b) => (b.score || 0) - (a.score || 0)).map((r) => r.text),
+    [remarks]
+  )
+
+  const bump = (m) =>
+    setMedicines((ms) => ms.map((x) => (x.id === m.id ? { ...x, score: (x.score || 0) + 1 } : x)))
+
   /* `generic` rides along on the pad item: the safety check matches on
      generic names (aspirin, warfarin…), and brand names alone would sail
-     straight past it. */
-  const pick = (m, dose) =>
+     straight past it. A preset overrides the medicine's default dosage. */
+  const pick = (m, preset) => {
     addItem(sec.key, {
       medId: m.id,
       name: `${m.brand} ${m.strength}`.trim(),
       generic: m.generic || '',
       form: m.form,
-      dose: dose || m.dose || '১+০+১',
-      timing: m.timing || 'খাবার পরে',
-      duration: m.duration || 'চলবে',
+      dose: preset?.dose || m.dose || '১+০+১',
+      timing: preset?.timing || m.timing || 'খাবার পরে',
+      duration: preset?.duration || m.duration || 'চলবে',
     })
+    bump(m)
+  }
 
   const addNewMedicine = () => {
     const name = q.trim()
     if (!name) return
-    const m = { id: padId('m'), brand: name, strength: '', form: 'Tablet', generic: '', dose: '১+০+১', timing: 'খাবার পরে', duration: 'চলবে' }
+    const m = { id: padId('m'), brand: name, strength: '', form: 'Tablet', generic: '', company: '', score: 1, hidden: false, presets: [], dose: '১+০+১', timing: 'খাবার পরে', duration: 'চলবে' }
     setMedicines((ms) => [...ms, m])
     pick(m)
     setQ('')
@@ -316,8 +342,13 @@ function MedicinePicker({ sec }) {
               menu={(close) => (
                 <>
                   {m.generic && <div className="cm-note">{m.generic}</div>}
+                  {(m.presets || []).map((p) => (
+                    <button key={p.id} className="cm-item" onClick={() => { pick(m, p); close() }}>
+                      {p.dose} ({p.duration}) — {p.timing}
+                    </button>
+                  ))}
                   {DOSES.map((d) => (
-                    <button key={d} className="cm-item" onClick={() => { pick(m, d); close() }}>
+                    <button key={d} className="cm-item" onClick={() => { pick(m, { dose: d }); close() }}>
                       {d}
                     </button>
                   ))}
@@ -376,7 +407,9 @@ function MedicinePicker({ sec }) {
                 {DOSES.map((d) => <option key={d}>{d}</option>)}
               </select>
               <select value={s.timing} onChange={(e) => patchItem(sec.key, s.uid, { timing: e.target.value })}>
-                {TIMINGS.map((t) => <option key={t}>{t}</option>)}
+                {(timingOptions.includes(s.timing) ? timingOptions : [s.timing, ...timingOptions]).map((t) => (
+                  <option key={t}>{t}</option>
+                ))}
               </select>
               <select value={s.duration} onChange={(e) => patchItem(sec.key, s.uid, { duration: e.target.value })}>
                 {DURATIONS.map((d) => <option key={d}>{d}</option>)}
@@ -404,7 +437,14 @@ function FollowupPicker({ sec }) {
 
   const items = master[sec.key] || []
   const selected = rx.items[sec.key] || []
-  const filtered = q.trim() ? items.filter((i) => i.text.toLowerCase().includes(q.trim().toLowerCase())) : items
+  const visible = items.filter((i) => !i.hidden).sort((a, b) => (b.score || 0) - (a.score || 0))
+  const filtered = q.trim() ? visible.filter((i) => i.text.toLowerCase().includes(q.trim().toLowerCase())) : visible
+
+  const bump = (item) =>
+    setMaster((ms) => ({
+      ...ms,
+      [sec.key]: (ms[sec.key] || []).map((i) => (i.id === item.id ? { ...i, score: (i.score || 0) + 1 } : i)),
+    }))
 
   const addInterval = () => {
     const num = parseInt(n, 10)
@@ -424,7 +464,7 @@ function FollowupPicker({ sec }) {
   const addMaster = () => {
     const text = q.trim()
     if (!text) return
-    setMaster((ms) => ({ ...ms, [sec.key]: [...(ms[sec.key] || []), { id: padId('i'), text, subs: [] }] }))
+    setMaster((ms) => ({ ...ms, [sec.key]: [...(ms[sec.key] || []), { id: padId('i'), text, subs: [], score: 1 }] }))
     addItem(sec.key, { text })
     setQ('')
   }
@@ -485,7 +525,7 @@ function FollowupPicker({ sec }) {
           <Chip
             key={item.id}
             label={item.text}
-            onPick={() => addItem(sec.key, { text: item.text })}
+            onPick={() => { addItem(sec.key, { text: item.text }); bump(item) }}
             menu={(close) => (
               <button
                 className="cm-item danger"

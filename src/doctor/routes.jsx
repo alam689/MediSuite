@@ -8,8 +8,11 @@ import DoctorConsults from './DoctorConsults.jsx'
 import DoctorNotes from './DoctorNotes.jsx'
 import DoctorPrescribe from './DoctorPrescribe.jsx'
 import PrescriptionPad from './pad/PrescriptionPad.jsx'
+import PresetSettings from './pad/PresetSettings.jsx'
+import PadPatients, { PadPatientDetail } from './pad/PadPatients.jsx'
 import DoctorLabs from './DoctorLabs.jsx'
 import DoctorEarnings from './DoctorEarnings.jsx'
+import DoctorReports from './DoctorReports.jsx'
 import DoctorProfile from './DoctorProfile.jsx'
 
 /* The whole doctor portal as one lazy-loaded chunk — provider, shell and
@@ -28,8 +31,12 @@ export default function DoctorRoutes() {
           <Route path="notes" element={<DoctorNotes />} />
           <Route path="prescriptions" element={<DoctorPrescribe />} />
           <Route path="pad" element={<PrescriptionPad />} />
+          <Route path="presets" element={<PresetSettings />} />
+          <Route path="rx-patients" element={<PadPatients />} />
+          <Route path="rx-patients/:id" element={<PadPatientDetail />} />
           <Route path="labs" element={<DoctorLabs />} />
           <Route path="earnings" element={<DoctorEarnings />} />
+          <Route path="reports" element={<DoctorReports />} />
           <Route path="profile" element={<DoctorProfile />} />
           <Route path="*" element={<Navigate to="/doctor" replace />} />
         </Route>

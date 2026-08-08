@@ -1,6 +1,8 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import {
   FilePlus2, Printer, Settings, Search, Save, ShieldAlert, SlidersHorizontal, LayoutPanelTop, X,
+  DatabaseZap, BookUser,
 } from 'lucide-react'
 import { useData, newId } from '../../store/DataStore.jsx'
 import { useToast } from '../../components/ui/Toast.jsx'
@@ -41,10 +43,12 @@ function TemplateBox() {
   const [open, setOpen] = useState(false)
   const boxRef = useRef(null)
 
+  /* Most-used templates first — same score ranking as the pickers. */
   const matches = useMemo(() => {
     const s = q.trim().toLowerCase()
-    if (!s) return templates
-    return templates.filter((t) => t.name.toLowerCase().includes(s))
+    const ranked = [...templates].sort((a, b) => (b.score || 0) - (a.score || 0))
+    if (!s) return ranked
+    return ranked.filter((t) => t.name.toLowerCase().includes(s))
   }, [q, templates])
 
   const exact = matches.some((t) => t.name.toLowerCase() === q.trim().toLowerCase())
@@ -54,7 +58,11 @@ function TemplateBox() {
     const name = q.trim()
     if (!name) return
     if (!hasContent) return toast.warning('Pad is empty — nothing to save as a template.')
-    setTemplates((t) => [...t, { id: padId('tpl'), name, items: JSON.parse(JSON.stringify(rx.items)) }])
+    /* Type follows what the pad actually holds: medicines make it a
+       Medicines template, otherwise it belongs to the busiest section. */
+    const keys = Object.keys(rx.items).filter((k) => rx.items[k]?.length)
+    const type = keys.includes('rx') || !keys.length ? 'Medicines' : keys[0]
+    setTemplates((t) => [...t, { id: padId('tpl'), name, type, score: 0, items: JSON.parse(JSON.stringify(rx.items)) }])
     toast.success(`Template “${name}” saved.`)
     setQ('')
     setOpen(false)
@@ -62,6 +70,7 @@ function TemplateBox() {
 
   const use = (tpl) => {
     applyTemplate(tpl)
+    setTemplates((t) => t.map((x) => (x.id === tpl.id ? { ...x, score: (x.score || 0) + 1 } : x)))
     toast.success(`Template “${tpl.name}” applied.`)
     setQ('')
     setOpen(false)
@@ -112,10 +121,11 @@ function TemplateBox() {
 }
 
 function PadWorkbench() {
-  const { rx, savePad, newPrescription } = usePad()
+  const { rx, savePad, newPrescription, setPatient, applyTemplate } = usePad()
   const { records, add } = useData()
   const { me, filedAs } = useDoctor()
   const toast = useToast()
+  const location = useLocation()
 
   const [view, setView] = useState('pad') // 'pad' | 'layout'
   const [showHide, setShowHide] = useState(false)
@@ -124,6 +134,23 @@ function PadWorkbench() {
   const [autoPrint, setAutoPrint] = useState(false)
   const [confirm, setConfirm] = useState(null) // {findings: [{med, findings}], andPrint}
   const [acknowledged, setAcknowledged] = useState(false)
+
+  /* Hand-off from the Rx patient list: "Write Prescription" arrives with a
+     patientId, "Follow Up" / "Print" also carry the previous sheet's items.
+     The state is cleared after applying so a refresh starts clean. */
+  useEffect(() => {
+    const st = location.state
+    if (!st?.patientId) return
+    const rec = records('patients').find((p) => p.resourceId === st.patientId)
+    if (rec) setPatient(rec)
+    if (st.items) applyTemplate({ items: st.items })
+    if (st.print) {
+      setAutoPrint(true)
+      setPreview(true)
+    }
+    window.history.replaceState({}, '')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const meds = rx.items.rx || []
   const hasContent = Object.values(rx.items || {}).some((a) => a && a.length)
@@ -253,6 +280,12 @@ function PadWorkbench() {
           <button className="tb-gear" title="Prescription Layout — sections setup" onClick={() => setSectionSetup((o) => !o)}>
             <LayoutPanelTop size={17} />
           </button>
+          <Link to="/doctor/presets" className="tb-gear" title="Preset Data settings — templates, medicines, phrases & scores">
+            <DatabaseZap size={17} />
+          </Link>
+          <Link to="/doctor/rx-patients" className="tb-gear" title="Patient list — visit history & follow-ups">
+            <BookUser size={17} />
+          </Link>
           <TemplateBox />
         </div>
       </header>

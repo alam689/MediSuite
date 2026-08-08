@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react'
 import {
-  SEED_MASTER, SEED_GROUPS, SEED_MEDICINES, SEED_MEDICINE_GROUPS,
+  SEED_MASTER, SEED_GROUPS, SEED_MEDICINES, SEED_MEDICINE_GROUPS, SEED_REMARKS,
   DEFAULT_LAYOUT, DEFAULT_VISIBILITY, DEFAULT_SECTIONS, padId,
 } from './padData.js'
 
@@ -65,6 +65,9 @@ export function PadProvider({ children }) {
   const [groups, setGroups] = useLocal('medisuite-rxpad.groups', SEED_GROUPS)
   const [medicines, setMedicines] = useLocal('medisuite-rxpad.medicines', SEED_MEDICINES)
   const [medGroups, setMedGroups] = useLocal('medisuite-rxpad.medGroups', SEED_MEDICINE_GROUPS)
+  /* Medicine Remarks master — the scored instruction phrases behind the
+     picker's timing dropdown and the Preset Data settings page. */
+  const [remarks, setRemarks] = useLocal('medisuite-rxpad.remarks', SEED_REMARKS)
   const [templates, setTemplates] = useLocal('medisuite-rxpad.templates', [])
   const [savedPads, setSavedPads] = useLocal('medisuite-rxpad.saved', [])
   /* v2: saved values win over defaults, so the switch to blank-page printing
@@ -151,20 +154,24 @@ export function PadProvider({ children }) {
     [rx, setSavedPads]
   )
 
+  /* Removing a visit from the patient timeline deletes the saved sheet
+     only — RX records already filed to the pharmacy are left alone. */
+  const deletePad = useCallback((id) => setSavedPads((s) => s.filter((r) => r.id !== id)), [setSavedPads])
+
   const value = useMemo(
     () => ({
       master, setMaster, groups, setGroups, medicines, setMedicines, medGroups, setMedGroups,
-      templates, setTemplates, savedPads, layout, setLayout,
+      remarks, setRemarks, templates, setTemplates, savedPads, layout, setLayout,
       visibility, setVisibility, sections, setSections, leftSections, rightSections,
       headerHtml, setHeaderHtml,
       rx, addItem, removeItem, patchItem, setPatient,
-      newPrescription, applyTemplate, savePad,
+      newPrescription, applyTemplate, savePad, deletePad,
     }),
-    [master, groups, medicines, medGroups, templates, savedPads, layout, visibility, rx,
+    [master, groups, medicines, medGroups, remarks, setRemarks, templates, savedPads, layout, visibility, rx,
      sections, setSections, leftSections, rightSections, headerHtml, setHeaderHtml,
      setMaster, setGroups, setMedicines, setMedGroups, setTemplates,
      setLayout, setVisibility, addItem, removeItem, patchItem, setPatient,
-     newPrescription, applyTemplate, savePad]
+     newPrescription, applyTemplate, savePad, deletePad]
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
