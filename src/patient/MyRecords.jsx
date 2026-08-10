@@ -1,47 +1,75 @@
-import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   HeartPulse,
   Pill,
   CalendarClock,
-  FlaskConical,
   FileText,
-  Paperclip,
   AlertTriangle,
+  Stethoscope,
+  X,
 } from 'lucide-react'
-import Modal from '../components/ui/Modal.jsx'
 import { usePatient } from './PatientContext.jsx'
-import { prettyDate, LAB_STATUS_TEXT } from './helpers.js'
+import { prettyDate } from './helpers.js'
+import MyReports from './MyReports.jsx'
+import MyVaccines from './MyVaccines.jsx'
+import MyPrescriptions from './MyPrescriptions.jsx'
+
+/* =====================================================================
+   My records is the one place for everything the system knows about the
+   patient. Reports, vaccine history and prescriptions used to be separate
+   top-nav items; they are tabs here now so the nav stays short and a
+   patient never has to guess which of two document shelves to open.
+
+   The old Documents tab is gone: it held clinic-issued files (lab report
+   images), which is exactly what Reports is — one kind of thing, one
+   shelf. Clinic-attached files now show inside the Reports tab.
+
+   The tab lives in the URL (?tab=reports) so notifications and home-page
+   tiles can deep-link to a specific shelf.
+   ===================================================================== */
 
 const TABS = [
   { key: 'summary', label: 'Summary' },
-  { key: 'results', label: 'Test results' },
+  { key: 'reports', label: 'Tests & reports' },
+  { key: 'vaccines', label: 'Vaccine history' },
+  { key: 'prescriptions', label: 'Prescriptions' },
   { key: 'notes', label: 'Visit notes' },
-  { key: 'documents', label: 'Documents' },
 ]
 
 export default function MyRecords() {
   const { me, mine } = usePatient()
-  const [tab, setTab] = useState('summary')
-  const [viewer, setViewer] = useState(null)
+  const [params, setParams] = useSearchParams()
+  /* ?tab=results predates the merge of Test results into Tests & reports —
+     old links keep landing somewhere sensible. */
+  const raw = params.get('tab') === 'results' ? 'reports' : params.get('tab')
+  const tab = TABS.some((t) => t.key === raw) ? raw : 'summary'
+  /* ?doctor=Dr.%20Malik scopes the whole page to one doctor — this is what
+     Find a doctor → My doctors → History opens. */
+  const doctor = params.get('doctor') || ''
+  const setQuery = (next) => setParams(next, { replace: true })
+  const setTab = (key) =>
+    setQuery({ ...(key !== 'summary' ? { tab: key } : {}), ...(doctor ? { doctor } : {}) })
+  const clearDoctor = () => setQuery(tab !== 'summary' ? { tab } : {})
+  const byDoctor = (r) => !doctor || r.doctor === doctor
 
-  const labs = mine('laboratory')
   /* Only signed notes are shown. A draft or unsigned note is not yet the
      clinician's word — surfacing it to the patient would misrepresent it as
      final. Blueprint §13.5: preserve signed records, amend rather than edit. */
-  const notes = mine('emr').filter((n) => n.status === 'Signed')
-  const unsigned = mine('emr').length - notes.length
+  const notes = mine('emr').filter((n) => n.status === 'Signed' && byDoctor(n))
+  const unsigned = mine('emr').filter((n) => n.status !== 'Signed' && byDoctor(n)).length
 
   const conditions = me?.conditions || []
   const medications = me?.medications || []
-  const visits = me?.visits || []
-  const documents = me?.documents || []
+  const visits = (me?.visits || []).filter(byDoctor)
 
   return (
     <>
       <header className="pt-head">
         <div>
           <h1 className="pt-title">My records</h1>
-          <p className="pt-sub">Your history, results and documents — all in one place.</p>
+          <p className="pt-sub">
+            Your history, results, reports, vaccines and prescriptions — all in one place.
+          </p>
         </div>
       </header>
 
@@ -56,6 +84,24 @@ export default function MyRecords() {
           </button>
         ))}
       </div>
+
+      {doctor && (
+        <div className="pt-callout" style={{ marginBottom: 14, alignItems: 'center' }}>
+          <span className="pt-callout-icon">
+            <Stethoscope size={18} />
+          </span>
+          <div style={{ flex: 1 }}>
+            <div className="pt-callout-title">Showing your records with {doctor}</div>
+            <div className="pt-callout-sub">
+              Visits, notes and prescriptions are filtered to this doctor. Reports and vaccine
+              cards carry no doctor on them, so they are shown in full.
+            </div>
+          </div>
+          <button className="btn btn-ghost" style={{ height: 34 }} onClick={clearDoctor}>
+            <X size={14} /> Show all
+          </button>
+        </div>
+      )}
 
       {tab === 'summary' && (
         <div className="pt-two">
@@ -141,42 +187,9 @@ export default function MyRecords() {
         </div>
       )}
 
-      {tab === 'results' && (
-        <section className="pt-panel">
-          <div className="pt-panel-head">
-            <FlaskConical size={16} /> Test results
-            <span className="count">{labs.length}</span>
-          </div>
-          <div className="pt-panel-body">
-            {labs.length === 0 && <p className="pt-empty">No test results yet.</p>}
-            {labs.map((l) => (
-              <div className="pt-row" key={l.resourceId}>
-                <div>
-                  <div className="pt-row-title">{l.test}</div>
-                  <div className="pt-row-sub">
-                    {l.result} · {l.resourceId}
-                  </div>
-                </div>
-                <div className="pt-row-right">
-                  <span
-                    className={`pill tone-${
-                      l.status === 'Abnormal' ? 'rose' : l.status === 'Approved' ? 'green' : 'blue'
-                    }`}
-                  >
-                    {LAB_STATUS_TEXT[l.status] || l.status}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-          {labs.some((l) => l.status === 'Abnormal') && (
-            <p className="pt-empty" style={{ textAlign: 'left', borderTop: '1px solid var(--border)' }}>
-              A result outside the usual range doesn't necessarily mean something is wrong. Your
-              doctor will go through it with you.
-            </p>
-          )}
-        </section>
-      )}
+      {tab === 'reports' && <MyReports doctorFilter={doctor} />}
+      {tab === 'vaccines' && <MyVaccines />}
+      {tab === 'prescriptions' && <MyPrescriptions doctorFilter={doctor} />}
 
       {tab === 'notes' && (
         <section className="pt-panel">
@@ -210,51 +223,6 @@ export default function MyRecords() {
           )}
         </section>
       )}
-
-      {tab === 'documents' && (
-        <section className="pt-panel">
-          <div className="pt-panel-head">
-            <Paperclip size={16} /> Documents
-            <span className="count">{documents.length}</span>
-          </div>
-          {documents.length === 0 ? (
-            <p className="pt-empty">No documents yet.</p>
-          ) : (
-            <div className="pt-docs-grid">
-              {documents.map((d) => (
-                <button className="pt-doc-card" key={d.id} onClick={() => setViewer(d)}>
-                  {d.kind === 'image' ? (
-                    <img className="pt-doc-thumb" src={d.dataUrl} alt="" />
-                  ) : (
-                    <div className="pt-doc-thumb" style={{ display: 'grid', placeItems: 'center' }}>
-                      <FileText size={26} style={{ color: 'var(--text-faint)' }} />
-                    </div>
-                  )}
-                  <div className="pt-doc-name-sm">{d.name}</div>
-                  <div className="pt-row-sub">{d.type}</div>
-                </button>
-              ))}
-            </div>
-          )}
-        </section>
-      )}
-
-      <Modal
-        open={!!viewer}
-        onClose={() => setViewer(null)}
-        title={viewer?.name}
-        subtitle="Document"
-        width={720}
-      >
-        {viewer &&
-          (viewer.kind === 'image' ? (
-            <img className="pt-view-img" src={viewer.dataUrl} alt={viewer.name} />
-          ) : (
-            <a className="btn btn-primary" href={viewer.dataUrl} download={viewer.name}>
-              Download {viewer.name}
-            </a>
-          ))}
-      </Modal>
     </>
   )
 }

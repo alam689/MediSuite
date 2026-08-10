@@ -10,6 +10,7 @@ import {
   FlaskConical,
   ShieldCheck,
   BedDouble,
+  Ambulance,
 } from 'lucide-react'
 import { usePatient, firstName } from './PatientContext.jsx'
 import { upcoming, greeting, prettyDate } from './helpers.js'
@@ -17,8 +18,9 @@ import { upcoming, greeting, prettyDate } from './helpers.js'
 const QUICK = [
   { to: '/patient/doctors', icon: CalendarPlus, title: 'Book an appointment', desc: 'Find a doctor and pick a time.' },
   { to: '/patient/beds', icon: BedDouble, title: 'Critical care beds', desc: 'ICU, CCU and ventilator availability.' },
-  { to: '/patient/records', icon: FileText, title: 'My records', desc: 'History, results and documents.' },
-  { to: '/patient/prescriptions', icon: Pill, title: 'Prescriptions', desc: 'Current and past medication.' },
+  { to: '/patient/ambulance', icon: Ambulance, title: 'Ambulance', desc: 'Find, request and track an ambulance.' },
+  { to: '/patient/records', icon: FileText, title: 'My records', desc: 'History, results, reports and vaccines.' },
+  { to: '/patient/records?tab=prescriptions', icon: Pill, title: 'Prescriptions', desc: 'Current and past medication.' },
 ]
 
 export default function PatientHome() {

@@ -1,0 +1,63 @@
+# AITMS infrastructure — the storage/imaging tier of the recommended
+# architecture. The NestJS API (server/) and the Vite frontend run on the
+# host during development; these are the services they talk to.
+#
+#   docker compose up -d
+#
+#   PostgreSQL  localhost:5432  — patients, reports metadata, permissions, audit
+#   Orthanc     localhost:8042  — PACS: DICOM studies (X-ray/CT/MRI/US), DICOMweb REST
+#   MinIO       localhost:9000  — object store: PDFs, scanned films (console :9001)
+#
+# Dev credentials only — rotate every value before anything real touches this.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: aitms-postgres
+    environment:
+      POSTGRES_USER: aitms
+      POSTGRES_PASSWORD: aitms_dev_password
+      POSTGRES_DB: aitms
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U aitms']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  orthanc:
+    image: orthancteam/orthanc:latest
+    container_name: aitms-orthanc
+    environment:
+      ORTHANC__NAME: 'AITMS PACS'
+      # DICOMweb is the seam the whole architecture leans on:
+      #   STOW-RS upload · QIDO-RS search · WADO-RS retrieve (OHIF reads this)
+      ORTHANC__DICOM_WEB__ENABLE: 'true'
+      ORTHANC__AUTHENTICATION_ENABLED: 'true'
+      ORTHANC__REGISTERED_USERS: '{"aitms": "aitms_dev_password"}'
+    ports:
+      - '8042:8042' # HTTP / DICOMweb / built-in explorer
+      - '4242:4242' # DICOM protocol (modalities push here)
+    volumes:
+      - orthanc-data:/var/lib/orthanc/db
+
+  minio:
+    image: minio/minio:latest
+    container_name: aitms-minio
+    command: server /data --console-address ':9001'
+    environment:
+      MINIO_ROOT_USER: aitms
+      MINIO_ROOT_PASSWORD: aitms_dev_password
+    ports:
+      - '9000:9000' # S3 API
+      - '9001:9001' # web console
+    volumes:
+      - minio-data:/data
+
+volumes:
+  pgdata:
+  orthanc-data:
+  minio-data:

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Star, CalendarPlus, CheckCircle2, Search, MapPin, Video, Building2 } from 'lucide-react'
+import { Star, CalendarPlus, CheckCircle2, Search, MapPin, Video, Building2, History } from 'lucide-react'
 import { useData, newId } from '../store/DataStore.jsx'
 import { useToast } from '../components/ui/Toast.jsx'
 import Modal from '../components/ui/Modal.jsx'
@@ -8,17 +8,18 @@ import Avatar from '../components/ui/Avatar.jsx'
 import Calendar from './Calendar.jsx'
 import SearchSelect from './SearchSelect.jsx'
 import { usePatient } from './PatientContext.jsx'
-import { prettyDate, schedulingName, parseDays, chambersFor, slotsFor } from './helpers.js'
+import { prettyDate, schedulingName, parseDays, chambersFor, slotsFor, localISO } from './helpers.js'
 
 export default function FindDoctor() {
   const { records, add } = useData()
-  const { name } = usePatient()
+  const { name, me, mine } = usePatient()
   const toast = useToast()
   const navigate = useNavigate()
 
   const doctors = records('doctors')
   const appointments = records('appointments')
 
+  const [part, setPart] = useState('all') // 'all' registered | 'mine' visited earlier
   const [q, setQ] = useState('')
   const [spec, setSpec] = useState('All')
   const [hospital, setHospital] = useState('') // free text: '' means any
@@ -33,6 +34,39 @@ export default function FindDoctor() {
     () => ['All', ...new Set(doctors.map((d) => d.specialization).filter(Boolean))],
     [doctors]
   )
+
+  /* "My doctors": everyone this patient has actually seen — past (not
+     cancelled) appointments, consults, prescriptions written for them and
+     visits on the record. Those records store the short scheduling name
+     ("Dr. Malik"), so registry entries are matched via schedulingName().
+     The value is the most recent contact date, for the "last visit" line. */
+  const myDoctors = useMemo(() => {
+    const seen = new Map()
+    const note = (doctor, dateIso) => {
+      if (!doctor) return
+      const prev = seen.get(doctor) || ''
+      if (String(dateIso || '') >= prev) seen.set(doctor, dateIso || prev)
+    }
+    const today = localISO()
+    for (const a of mine('appointments'))
+      if (a.status !== 'Cancelled' && (a.date || '') < today) note(a.doctor, a.date)
+    for (const c of mine('telemedicine')) if (c.status !== 'Cancelled') note(c.doctor, c.date)
+    for (const r of mine('prescriptions'))
+      note(r.doctor, r.issuedAt ? new Date(r.issuedAt).toISOString().slice(0, 10) : '')
+    for (const v of me?.visits || []) note(v.doctor, v.date)
+    return seen
+  }, [mine, me])
+
+  const lastSeen = (d) => myDoctors.get(schedulingName(d.name))
+  const myCount = useMemo(
+    () => doctors.filter((d) => d.status !== 'On leave' && myDoctors.has(schedulingName(d.name))).length,
+    [doctors, myDoctors]
+  )
+
+  /* "History" opens My records scoped to this doctor — one place for the
+     whole shared record, same page the patient already knows. */
+  const openHistory = (d) =>
+    navigate(`/patient/records?doctor=${encodeURIComponent(schedulingName(d.name))}`)
 
   /* Every hospital any bookable doctor sits at — the suggestion list. */
   const hospitals = useMemo(
@@ -59,13 +93,14 @@ export default function FindDoctor() {
     () =>
       doctors.filter((d) => {
         if (d.status === 'On leave') return false // don't offer someone who can't be booked
+        if (part === 'mine' && !myDoctors.has(schedulingName(d.name))) return false
         if (spec !== 'All' && d.specialization !== spec) return false
         if (!matchesHospital(d)) return false
         const hay = `${d.name} ${d.specialization || ''}`.toLowerCase()
         return hay.includes(q.trim().toLowerCase())
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [doctors, q, spec, hospitalQ]
+    [doctors, q, spec, hospitalQ, part, myDoctors]
   )
 
   /* How many hospitals the current text matches — shown so a typo reads as
@@ -155,6 +190,15 @@ export default function FindDoctor() {
         </div>
       </header>
 
+      <div className="pt-chips" style={{ marginBottom: 12 }}>
+        <button className={`pt-chip ${part === 'all' ? 'on' : ''}`} onClick={() => setPart('all')}>
+          All doctors
+        </button>
+        <button className={`pt-chip ${part === 'mine' ? 'on' : ''}`} onClick={() => setPart('mine')}>
+          My doctors{myCount ? ` (${myCount})` : ''}
+        </button>
+      </div>
+
       <div className="pt-filters">
         <span style={{ position: 'relative', flex: 1, display: 'flex' }}>
           <Search
@@ -204,7 +248,11 @@ export default function FindDoctor() {
 
       {list.length === 0 ? (
         <div className="pt-panel">
-          <p className="pt-empty">No doctors match that search.</p>
+          <p className="pt-empty">
+            {part === 'mine' && !myCount
+              ? 'No doctors here yet — once you have a consultation or a prescription, that doctor appears in this list.'
+              : 'No doctors match that search.'}
+          </p>
         </div>
       ) : (
         <div className="pt-docs">
@@ -228,6 +276,11 @@ export default function FindDoctor() {
                   {d.status}
                 </span>
               </div>
+              {part === 'mine' && lastSeen(d) && (
+                <div className="pt-row-sub" style={{ marginTop: 6 }}>
+                  Last visit: {prettyDate(lastSeen(d))}
+                </div>
+              )}
               <div className="pt-doc-places">
                 {chambersFor(d).map((c) => (
                   <span className="pt-doc-place" key={c.name} title={`${c.address} · ${c.days}`}>
@@ -236,9 +289,20 @@ export default function FindDoctor() {
                   </span>
                 ))}
               </div>
-              <button className="btn btn-primary" onClick={() => openBooking(d)}>
-                <CalendarPlus size={15} /> Book
-              </button>
+              {part === 'mine' ? (
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => openHistory(d)}>
+                    <History size={15} /> History
+                  </button>
+                  <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => openBooking(d)}>
+                    <CalendarPlus size={15} /> Book
+                  </button>
+                </div>
+              ) : (
+                <button className="btn btn-primary" onClick={() => openBooking(d)}>
+                  <CalendarPlus size={15} /> Book
+                </button>
+              )}
             </article>
           ))}
         </div>

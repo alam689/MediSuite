@@ -1375,3 +1375,35 @@
     width: 100%;
   }
 }
+
+/* ---- Prescription visits (doctor's timeline, embedded) ----------------
+   The section-counter hover popover is absolutely positioned on the
+   doctor's page, where nothing clips it. Embedded here it sits inside a
+   .pt-panel with overflow:hidden and other panels stacked below, so it
+   was cut off / painted under the next panel. Fixed positioning takes it
+   out of the panel entirely; the exact coordinates are set on hover by
+   placePop() in PrescriptionVisits.jsx, which also flips it above the
+   chip when there is no room below. */
+.pt-rx-visits .pp-sec-pop {
+  position: fixed;
+  bottom: auto;
+  top: 0;
+  left: 0;
+  transform: none;
+  z-index: 90;
+}
+.pt-rx-visits .pp-sec-pop::after {
+  top: auto;
+  bottom: 100%;
+  left: 18px;
+  transform: none;
+  border-top-color: transparent;
+  border-bottom-color: #fff;
+}
+/* Arrow points down when the popover is flipped above the chip. */
+.pt-rx-visits .pp-sec-pop.above::after {
+  top: 100%;
+  bottom: auto;
+  border-bottom-color: transparent;
+  border-top-color: #fff;
+}

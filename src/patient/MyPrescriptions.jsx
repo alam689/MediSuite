@@ -1,10 +1,12 @@
-import { useState } from 'react'
-import { Pill, ShieldAlert, RefreshCw } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Pill, ShieldAlert, RefreshCw, ClipboardList } from 'lucide-react'
 import { useData } from '../store/DataStore.jsx'
 import { useToast } from '../components/ui/Toast.jsx'
 import Modal from '../components/ui/Modal.jsx'
 import { usePatient } from './PatientContext.jsx'
 import { RX_STATUS_TEXT } from './helpers.js'
+import { padsFor } from './RxSheetView.jsx'
+import PrescriptionVisits from './PrescriptionVisits.jsx'
 
 const TONE = {
   Issued: 'blue',
@@ -21,14 +23,20 @@ const HOLD_REASON = {
   Interaction: 'This may interact with another medicine you take. Your doctor is checking it before it can be issued.',
 }
 
-export default function MyPrescriptions() {
-  const { mine } = usePatient()
+export default function MyPrescriptions({ doctorFilter = '' }) {
+  const { me, mine } = usePatient()
   const { records } = useData()
   const toast = useToast()
   const [detail, setDetail] = useState(null)
 
-  const rows = mine('prescriptions')
+  const rows = mine('prescriptions').filter((r) => !doctorFilter || r.doctor === doctorFilter)
   const pharmacy = records('pharmacy')
+  /* The full consultation sheets the doctor wrote on the Rx pad — the
+     patient sees the very visit timeline the doctor sees, read-only. */
+  const pads = useMemo(
+    () => padsFor(me?.resourceId).filter((p) => !doctorFilter || p.doctor === doctorFilter),
+    [me, doctorFilter]
+  )
 
   const requestRefill = (r) => {
     // Deliberately does not mutate the prescription: a refill is a clinical
@@ -41,12 +49,24 @@ export default function MyPrescriptions() {
 
   return (
     <>
-      <header className="pt-head">
-        <div>
-          <h1 className="pt-title">Prescriptions</h1>
-          <p className="pt-sub">Medicines your doctors have prescribed for you.</p>
+      <section className="pt-panel" style={{ marginBottom: 14 }}>
+        <div className="pt-panel-head">
+          <ClipboardList size={16} /> Prescription visits
+          <span className="count">{pads.length}</span>
         </div>
-      </header>
+        {pads.length === 0 ? (
+          <div className="pt-panel-body">
+            <p className="pt-empty">
+              When your doctor writes a full consultation sheet on the prescription pad, it appears
+              here exactly as they printed it.
+            </p>
+          </div>
+        ) : (
+          <div style={{ padding: '16px 16px 8px' }}>
+            <PrescriptionVisits pads={pads} />
+          </div>
+        )}
+      </section>
 
       <section className="pt-panel">
         <div className="pt-panel-head">

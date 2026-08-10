@@ -1,0 +1,97 @@
+// AITMS relational schema — groundwork for the PostgreSQL tier.
+//
+// The rule this schema encodes: Postgres stores WHO/WHEN/WHY and pointers;
+// pixels live in Orthanc (studyInstanceUid) and document blobs in MinIO
+// (objectKey). No image or PDF bytes ever land in a column here.
+//
+// To activate once Docker Postgres is up:
+//   cd server
+//   npm i -D prisma && npm i @prisma/client
+//   npx prisma migrate dev --name init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Patient {
+  id        String   @id @default(uuid())
+  name      String
+  dob       DateTime?
+  gender    String?
+  phone     String?
+  email     String?
+  createdAt DateTime @default(now())
+
+  studies   ImagingStudy[]
+  documents Document[]
+  vaccines  VaccineRecord[]
+  audits    AuditEvent[]
+}
+
+// One row per DICOM study held by Orthanc. The UID is the join key into
+// the PACS; OHIF opens the study by this UID over DICOMweb.
+model ImagingStudy {
+  id               String   @id @default(uuid())
+  studyInstanceUid String   @unique
+  modality         String // CR, US, CT, MR, ...
+  description      String?
+  studyDate        DateTime?
+  patient          Patient  @relation(fields: [patientId], references: [id])
+  patientId        String
+  createdAt        DateTime @default(now())
+}
+
+// A PDF or scanned film in MinIO. `kind` separates lab reports, signed
+// radiology reports, discharge summaries, scanned films, vaccine cards.
+model Document {
+  id        String   @id @default(uuid())
+  objectKey String   @unique // MinIO key, e.g. reports/2026/cbc-khorshed.pdf
+  kind      DocumentKind
+  title     String
+  mimeType  String   @default("application/pdf")
+  size      Int
+  patient   Patient  @relation(fields: [patientId], references: [id])
+  patientId String
+  createdAt DateTime @default(now())
+}
+
+enum DocumentKind {
+  LAB_REPORT
+  RADIOLOGY_REPORT
+  DISCHARGE_SUMMARY
+  PRESCRIPTION
+  SCANNED_FILM
+  VACCINE_CARD
+  OTHER
+}
+
+// Structured vaccine history: the card PDF is a Document; the row is what
+// the portal lists and clinicians query (e.g. "has this patient had TCV?").
+model VaccineRecord {
+  id         String   @id @default(uuid())
+  vaccine    String // "COVID-19 (Pfizer)", "Typhoid TCV", ...
+  doseNumber Int      @default(1)
+  givenAt    DateTime?
+  centre     String?
+  cardRef    String? // Document.id of the scanned card, when one exists
+  patient    Patient  @relation(fields: [patientId], references: [id])
+  patientId  String
+  createdAt  DateTime @default(now())
+}
+
+// Append-only. No update path exists in the API by design: a compliance
+// review asks "who saw this record" and this table is the answer.
+model AuditEvent {
+  id        String   @id @default(uuid())
+  actor     String // user id / role of who acted
+  action    String // VIEW_DOCUMENT, VIEW_STUDY, ISSUE_RX, ...
+  target    String // resource identifier acted on
+  patient   Patient? @relation(fields: [patientId], references: [id])
+  patientId String?
+  at        DateTime @default(now())
+}
