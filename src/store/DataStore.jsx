@@ -20,8 +20,13 @@ import { schemas } from '../data/schemas.js'
    Note what the bump does *not* do: saved records always win over the seed,
    so a browser that has already stored records keeps the dates it captured.
    That is correct — those are the user's edits — but it does mean the
-   relative dates only look fresh on a first load or after a reset. */
-const STORAGE_KEY = 'medisuite-data-v8'
+   relative dates only look fresh on a first load or after a reset.
+
+   v9 adds the ambulance fleet and its trip log: without a bump a returning
+   browser has no vehicles, and the patient's Ambulance page — which now
+   reads the fleet from here rather than a hard-coded list — would show an
+   empty map. */
+const STORAGE_KEY = 'medisuite-data-v9'
 const DataContext = createContext(null)
 
 let idSeq = Date.now()

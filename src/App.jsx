@@ -14,6 +14,7 @@ const DoctorRoutes = lazy(() => import('./doctor/routes.jsx'))
 const PharmacyRoutes = lazy(() => import('./pharmacy/routes.jsx'))
 const LabRoutes = lazy(() => import('./lab/routes.jsx'))
 const HospitalRoutes = lazy(() => import('./hospital/routes.jsx'))
+const AmbulanceRoutes = lazy(() => import('./ambulance/routes.jsx'))
 
 /* Deliberately quiet. The chunks are small and local, so a spinner would
    flash for a frame and read as jank; an empty frame reads as nothing. */
@@ -83,6 +84,16 @@ export default function App() {
           element={
             <RequireRole roles={['hospital']}>
               <HospitalRoutes />
+            </RequireRole>
+          }
+        />
+
+        {/* Ambulance operator — one service's fleet, crew and trips. */}
+        <Route
+          path="/ambulance/*"
+          element={
+            <RequireRole roles={['ambulance']}>
+              <AmbulanceRoutes />
             </RequireRole>
           }
         />

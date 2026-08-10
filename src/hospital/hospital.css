@@ -32,6 +32,7 @@
 }
 .hs-brand {
   display: flex;
+  flex: none;
   align-items: center;
   gap: 9px;
   font-size: 16.5px;
@@ -60,8 +61,13 @@
   color: var(--tone-violet);
   background: color-mix(in srgb, var(--tone-violet) 14%, transparent);
 }
+/* flex + min-width:0 is what stops the nav from overlapping the facility
+   picker: a flex item's default min-width is its content, so seven links
+   refuse to shrink and run straight under the controls on the right. */
 .hs-nav {
   display: flex;
+  flex: 1 1 0;
+  min-width: 0;
   gap: 2px;
   overflow-x: auto;
   scrollbar-width: none;
@@ -92,6 +98,9 @@
 }
 .hs-top-right {
   margin-left: auto;
+  /* Never squeezed: the facility every figure is scoped to, the alert
+     count and sign-out all have to stay reachable at any width. */
+  flex: none;
   display: flex;
   align-items: center;
   gap: 10px;

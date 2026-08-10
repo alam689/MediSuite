@@ -16,6 +16,7 @@ import {
   HeartPulse,
   Building2,
   Store,
+  Ambulance,
 } from 'lucide-react'
 import ThemeToggle from '../components/ThemeToggle.jsx'
 import { useAuth, ROLES, ROLE_KEYS } from '../auth/AuthContext.jsx'
@@ -40,6 +41,7 @@ const ICONS = {
   hospital: Building2,
   pharmacy: Store,
   lab: FlaskConical,
+  ambulance: Ambulance,
   admin: ShieldCheck,
 }
 
@@ -49,6 +51,7 @@ const WORKSPACE = {
   hospital: 'hospital admin desk',
   pharmacy: 'pharmacy dispensary',
   lab: 'laboratory bench',
+  ambulance: 'ambulance dispatch desk',
   admin: 'administrator console',
 }
 

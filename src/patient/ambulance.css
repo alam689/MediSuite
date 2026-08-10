@@ -1,110 +1,326 @@
 /* =====================================================================
-   Ambulance service — list/map toggle, the demo street map and the
-   tracking banner. Map colours come from theme tokens so both themes
-   work; the ambulance/patient markers keep fixed signal colours
-   (red cross, green available, amber en-route) because they are signal,
-   not chrome.
+   Ambulance service — list/map toggle, the Leaflet/OpenStreetMap map and
+   the tracking banner. The chrome around the map comes from theme tokens;
+   the markers keep fixed signal colours (green available, amber en-route,
+   grey busy, blue you/hospital) because they are signal, not chrome —
+   and they sit on photographic tiles, not on our surfaces.
    ===================================================================== */
 
 .amb-map-wrap {
+  position: relative;
   border: 1px solid var(--border);
   border-radius: 14px;
   overflow: hidden;
   background: var(--surface);
 }
-.amb-map {
-  display: block;
-  width: 100%;
+
+/* Full screen — the native API where the browser allows it, a fixed
+   overlay where it doesn't (iOS Safari). Both end up as a column with the
+   map taking whatever the legend leaves. */
+.amb-map-wrap:fullscreen,
+.amb-map-wrap.is-full {
+  display: flex;
+  flex-direction: column;
+  border: 0;
+  border-radius: 0;
+}
+.amb-map-wrap.is-full {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+}
+.amb-map-wrap:fullscreen .amb-real-map,
+.amb-map-wrap.is-full .amb-real-map {
+  flex: 1;
   height: auto;
-  user-select: none;
 }
 
-.amb-road {
-  stroke: color-mix(in srgb, var(--text) 14%, transparent);
-  stroke-width: 10;
-  stroke-linecap: round;
-}
-.amb-road.minor {
-  stroke-width: 5;
-  stroke: color-mix(in srgb, var(--text) 9%, transparent);
-}
-.amb-block {
-  fill: color-mix(in srgb, var(--text) 4%, transparent);
-}
-.amb-park {
-  fill: color-mix(in srgb, #2ea87c 14%, transparent);
-}
-.amb-label {
-  font-size: 11px;
-  fill: var(--text-faint);
-}
-.amb-hosp-label {
-  font-size: 11px;
+.amb-full-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1200;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12.5px;
   font-weight: 600;
-  fill: var(--text-muted);
+  cursor: pointer;
+  box-shadow: 0 1px 6px rgb(0 0 0 / 0.16);
+}
+.amb-full-btn:hover {
+  background: color-mix(in srgb, var(--text) 8%, var(--surface));
 }
 
-.amb-marker {
+/* Leaflet measures its container, so the height must be explicit —
+   an auto-height container renders a blank map. */
+.amb-real-map {
+  height: 460px;
+  width: 100%;
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+}
+@media (max-width: 700px) {
+  .amb-real-map {
+    height: 340px;
+  }
+}
+
+/* Leaflet's own chrome, retinted to the app's tokens. */
+.amb-real-map.leaflet-container {
+  font: inherit;
+}
+.amb-real-map .leaflet-control-attribution {
+  background: color-mix(in srgb, var(--surface) 85%, transparent);
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.amb-real-map .leaflet-control-attribution a {
+  color: var(--text-muted);
+}
+.amb-real-map .leaflet-bar a {
+  background: var(--surface);
+  color: var(--text);
+  border-bottom-color: var(--border);
+}
+.amb-real-map .leaflet-bar a:hover {
+  background: color-mix(in srgb, var(--text) 8%, var(--surface));
+}
+/* OSM tiles are light-only; dark theme dims and cools them so the
+   signal-coloured markers still carry the most contrast on the page. */
+:root[data-theme='dark'] .amb-real-map .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9) saturate(0.7);
+}
+
+/* divIcon wrapper: strip Leaflet's default white box. */
+.amb-div {
+  background: none;
+  border: 0;
+}
+
+/* ambulance marker: a pin carrying the vehicle sign, unit number below */
+.amb-mark {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   cursor: pointer;
+  --amb-mark: #2ea87c;
 }
-.amb-marker rect {
-  rx: 5;
-  stroke: #fff;
-  stroke-width: 1.5;
+.amb-mark.busy {
+  --amb-mark: #8a94a6;
 }
-.amb-marker.available rect {
-  fill: #2ea87c;
+.amb-mark.tracked {
+  --amb-mark: #e08a2e;
 }
-.amb-marker.busy rect {
-  fill: #8a94a6;
+.amb-mark-body {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  background: var(--amb-mark);
+  color: #fff;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.35);
 }
-.amb-marker.tracked rect {
-  fill: #e08a2e;
+/* the pin's point, so the marker reads as "the vehicle is here" */
+.amb-mark-body::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-top: -2px;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top: 7px solid #fff;
 }
-.amb-marker.selected rect {
-  stroke: var(--accent, #2e86d1);
-  stroke-width: 3;
+.amb-mark-body svg {
+  width: 19px;
+  height: 19px;
 }
-.amb-marker text {
+.amb-mark-id {
+  margin-top: 5px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--amb-mark);
+  border: 1px solid #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
   font-size: 10px;
   font-weight: 700;
-  fill: #fff;
+  line-height: 1.3;
+  color: #fff;
+}
+.amb-mark.selected .amb-mark-body {
+  outline: 3px solid #2e86d1;
+  outline-offset: 1px;
+}
+/* the dispatched vehicle keeps a soft beacon so it stays findable */
+.amb-mark.tracked .amb-mark-body {
+  animation: ambBeacon 1.6s ease-out infinite;
+}
+@keyframes ambBeacon {
+  from {
+    box-shadow: 0 2px 6px rgb(0 0 0 / 0.35), 0 0 0 0 rgb(224 138 46 / 0.55);
+  }
+  to {
+    box-shadow: 0 2px 6px rgb(0 0 0 / 0.35), 0 0 0 14px rgb(224 138 46 / 0);
+  }
 }
 
-.amb-you-dot {
-  fill: #2e86d1;
-  stroke: #fff;
-  stroke-width: 2.5;
+/* patient location: dot plus an expanding ping */
+.amb-pin {
+  position: relative;
+  display: block;
+  width: 26px;
+  height: 26px;
 }
-.amb-you-pulse {
-  fill: none;
-  stroke: #2e86d1;
+.amb-pin .dot,
+.amb-pin .pulse {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+.amb-pin .dot {
+  width: 14px;
+  height: 14px;
+  background: #2e86d1;
+  border: 2.5px solid #fff;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+}
+.amb-pin .pulse {
+  width: 16px;
+  height: 16px;
+  border: 3px solid #2e86d1;
   animation: ambPulse 2s ease-out infinite;
 }
 @keyframes ambPulse {
   from {
-    r: 8;
-    stroke-opacity: 0.8;
-    stroke-width: 3;
+    width: 16px;
+    height: 16px;
+    opacity: 0.8;
+    border-width: 3px;
   }
   to {
-    r: 26;
-    stroke-opacity: 0;
-    stroke-width: 1;
+    width: 52px;
+    height: 52px;
+    opacity: 0;
+    border-width: 1px;
   }
 }
 
-.amb-route {
-  fill: none;
-  stroke: #e08a2e;
-  stroke-width: 3;
-  stroke-dasharray: 7 6;
-  animation: ambDash 1.2s linear infinite;
+/* marker popup — the vehicle's details where the patient tapped */
+.amb-real-map .leaflet-popup-content-wrapper,
+.amb-real-map .leaflet-popup-tip {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.22);
 }
-@keyframes ambDash {
-  to {
-    stroke-dashoffset: -13;
-  }
+.amb-real-map .leaflet-popup-content-wrapper {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.amb-real-map .leaflet-popup-content {
+  margin: 12px 14px;
+  font: inherit;
+  line-height: 1.4;
+}
+.amb-real-map .leaflet-popup-close-button {
+  color: var(--text-muted);
+}
+
+.amb-pop-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+.amb-pop-id {
+  font-size: 15px;
+  font-weight: 700;
+}
+.amb-pop-state {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: #fff;
+}
+.amb-pop-state.ok {
+  background: #2ea87c;
+}
+.amb-pop-state.busy {
+  background: #8a94a6;
+}
+.amb-pop-state.tracked {
+  background: #e08a2e;
+}
+.amb-pop-type {
+  font-size: 13px;
+  font-weight: 600;
+}
+.amb-pop-op,
+.amb-pop-meta {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+.amb-pop-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 4px;
+}
+.amb-pop-tel {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent, #2e86d1);
+}
+.amb-pop-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.amb-pop-actions .btn {
+  flex: 1;
+  height: 32px;
+  font-size: 13px;
+  justify-content: center;
+  text-decoration: none;
+}
+.amb-pop-note {
+  margin-top: 8px;
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+
+.amb-legend-hint {
+  margin-left: auto;
+  color: var(--text-faint);
+}
+
+.amb-hosp {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  background: #2e86d1;
+  border: 1.5px solid #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
 }
 
 .amb-legend {

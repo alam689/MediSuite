@@ -21,6 +21,8 @@ import {
   BedDouble,
   ClipboardPlus,
   Network,
+  Ambulance,
+  Route,
 } from 'lucide-react'
 
 const accents = {
@@ -57,6 +59,29 @@ export const LABS = [
   'HeartCare Pathology',
   'Respira Diagnostics',
 ]
+
+/* Ambulance operators. Some are hospitals running their own vehicles, some
+   are independent services enlisting on the platform — both sign in to the
+   same portal, scoped to their own fleet. */
+export const AMBULANCE_OPERATORS = [
+  'City Emergency Service',
+  'Metro General Hospital',
+  'HeartCare Diagnostic',
+  'Respira Clinic',
+]
+
+export const AMBULANCE_TYPES = [
+  'ICU',
+  'Basic life support',
+  'NICU (newborn)',
+  'Freezer',
+  'Patient transport',
+]
+
+/* A vehicle is only offered to patients when the operator has it on duty
+   *and* it is roadworthy. Off duty and Maintenance are different answers to
+   "why can't I have it" and are kept apart deliberately. */
+export const AMBULANCE_STATUSES = ['Available', 'On another trip', 'Off duty', 'Maintenance']
 
 /* Critical-care units. "Life support" is the phrase families use; the
    clinical label is mechanical ventilation, so carry both. */
@@ -868,7 +893,10 @@ export const schemas = [
        Capacity answers "is there room"; this answers "where is Mr Chen". The
        two are kept apart on purpose — an admission that silently decremented
        a capacity row would double-count against the manual Admit action. */
-    statusTones: { Admitted: 'blue', Observation: 'amber', 'For discharge': 'violet', Discharged: 'green', Transferred: 'teal' },
+    /* Reserved sits *before* Admitted: a patient-side bed booking is a
+       request against a unit, not an occupancy. Nothing about it touches
+       the capacity count until admissions actually confirms it. */
+    statusTones: { Reserved: 'amber', Admitted: 'blue', Observation: 'amber', 'For discharge': 'violet', Discharged: 'green', Transferred: 'teal', Declined: 'rose', Cancelled: 'rose' },
     columns: [
       { key: 'resourceId', label: 'ID', type: 'ref' },
       { key: 'patient', label: 'Patient', type: 'strong' },
@@ -887,7 +915,7 @@ export const schemas = [
       { key: 'admittedOn', label: 'Admitted on', type: 'date' },
       { key: 'diagnosis', label: 'Admitting diagnosis', type: 'text', full: true },
       { key: 'payer', label: 'Payer', type: 'select', options: ['Self-pay', 'Insurance', 'Corporate', 'Government scheme'] },
-      { key: 'status', label: 'Status', type: 'select', options: ['Admitted', 'Observation', 'For discharge', 'Discharged', 'Transferred'] },
+      { key: 'status', label: 'Status', type: 'select', options: ['Reserved', 'Admitted', 'Observation', 'For discharge', 'Discharged', 'Transferred', 'Declined', 'Cancelled'] },
     ],
     defaults: { status: 'Admitted', unit: 'General ward', payer: 'Self-pay' },
     kpis: [
@@ -897,6 +925,10 @@ export const schemas = [
       { label: 'Discharged', tone: 'green', compute: (r) => byStatus(r, 'Discharged').toString() },
     ],
     actions: [
+      /* A patient booking arrives as Reserved and waits for a human. The
+         bed is only really held once someone in admissions says so. */
+      { key: 'acceptBed', label: 'Confirm bed', tone: 'blue', when: (r) => r.status === 'Reserved', patch: () => ({ status: 'Admitted', admittedOn: new Date().toISOString().slice(0, 10) }), toast: 'Bed booking confirmed — patient notified' },
+      { key: 'declineBed', label: 'Decline booking', tone: 'rose', when: (r) => r.status === 'Reserved', patch: () => ({ status: 'Declined' }), toast: 'Booking declined — deposit refundable' },
       { key: 'flag', label: 'Mark for discharge', tone: 'violet', when: (r) => r.status === 'Admitted' || r.status === 'Observation', patch: () => ({ status: 'For discharge' }), toast: 'Flagged for discharge planning' },
       { key: 'discharge', label: 'Discharge', tone: 'green', when: (r) => r.status === 'For discharge', patch: () => ({ status: 'Discharged', dischargedAt: Date.now() }), toast: 'Patient discharged — bed released' },
     ],
@@ -906,6 +938,114 @@ export const schemas = [
       { resourceId: 'ADM-2194', patient: 'Fatima Al-Sayed', hospital: 'NeuroCare Center', unit: 'HDU (high dependency)', bed: 'HDU-01', doctor: 'Dr. Farah', admittedOn: day(-3), diagnosis: 'Status migrainosus', payer: 'Self-pay', status: 'Observation' },
       { resourceId: 'ADM-2190', patient: 'James Okoro', hospital: 'Metro General Hospital', unit: 'General ward', bed: 'GW-17', doctor: 'Dr. Malik', admittedOn: day(-8), diagnosis: 'Hyperglycaemia', payer: 'Corporate', status: 'Discharged', dischargedAt: mins(2880) },
       { resourceId: 'ADM-2186', patient: 'Grace Wanjiru', hospital: 'SkinHealth Clinic', unit: 'Isolation', bed: 'ISO-01', doctor: 'Dr. Lin Wei', admittedOn: day(-1), diagnosis: 'Severe cellulitis', payer: 'Insurance', status: 'Admitted' },
+    ],
+  },
+
+  /* ---------------------------------------------------- Ambulance fleet */
+  {
+    key: 'ambulances',
+    label: 'Ambulance Fleet',
+    icon: Ambulance,
+    accent: accents.orange,
+    tagline: 'Enlisted Ambulances & Drivers',
+    desc: 'Vehicles enlisted by each operator, their crew, and whether they are on duty.',
+    entity: 'Ambulance',
+    idPrefix: 'AMB',
+    statusTones: { Available: 'green', 'On another trip': 'amber', 'Off duty': 'blue', Maintenance: 'rose' },
+    columns: [
+      { key: 'resourceId', label: 'ID', type: 'ref' },
+      { key: 'regNo', label: 'Registration', type: 'strong' },
+      { key: 'unitType', label: 'Type', filter: true },
+      { key: 'operator', label: 'Operator', filter: true },
+      { key: 'driverName', label: 'Driver' },
+      { key: 'status', label: 'Status', type: 'pill', filter: true },
+    ],
+    formFields: [
+      { key: 'regNo', label: 'Registration no.', type: 'text', required: true, full: true },
+      { key: 'operator', label: 'Operator', type: 'select', options: AMBULANCE_OPERATORS, required: true },
+      { key: 'unitType', label: 'Vehicle type', type: 'select', options: AMBULANCE_TYPES, required: true },
+      { key: 'phone', label: 'Dispatch phone', type: 'text', required: true },
+      { key: 'baseFee', label: 'Base fare', type: 'text' },
+      { key: 'station', label: 'Home station', type: 'text', full: true },
+      /* The crew is part of the enlistment, not an afterthought: a vehicle
+         with no named, licensed driver cannot legally be dispatched, so the
+         driver's details live on the record that gets offered to patients. */
+      { key: 'driverName', label: 'Driver name', type: 'text', required: true },
+      { key: 'driverPhone', label: 'Driver phone', type: 'text', required: true },
+      { key: 'driverLicense', label: 'Driving licence no.', type: 'text', required: true },
+      { key: 'licenseExpiry', label: 'Licence expiry', type: 'date' },
+      { key: 'driverExperience', label: 'Years driving', type: 'number' },
+      { key: 'paramedic', label: 'Paramedic on board', type: 'select', options: ['Yes', 'No'] },
+      { key: 'status', label: 'Status', type: 'select', options: AMBULANCE_STATUSES },
+    ],
+    defaults: { status: 'Available', unitType: 'Basic life support', paramedic: 'No', operator: AMBULANCE_OPERATORS[0] },
+    kpis: [
+      { label: 'Enlisted', tone: 'orange', compute: (r) => r.length.toString() },
+      { label: 'Available now', tone: 'green', compute: (r) => byStatus(r, 'Available').toString() },
+      { label: 'On a trip', tone: 'amber', compute: (r) => byStatus(r, 'On another trip').toString() },
+      { label: 'Off road', tone: 'rose', compute: (r) => byStatus(r, 'Off duty', 'Maintenance').toString() },
+    ],
+    actions: [
+      { key: 'onDuty', label: 'Put on duty', tone: 'green', when: (r) => r.status === 'Off duty' || r.status === 'Maintenance', patch: () => ({ status: 'Available', updatedAt: Date.now() }), toast: 'Vehicle is on duty' },
+      { key: 'offDuty', label: 'Take off duty', tone: 'blue', when: (r) => r.status === 'Available', patch: () => ({ status: 'Off duty', updatedAt: Date.now() }), toast: 'Vehicle taken off duty' },
+    ],
+    seed: [
+      { resourceId: 'AMB-201', regNo: 'DHA-MET-201', operator: 'Metro General Hospital', unitType: 'ICU', phone: '+880 17 1552 0041', baseFee: '৳1,500 base', station: 'Gulshan, Dhaka', lat: 23.804, lng: 90.398, driverName: 'Rafiqul Islam', driverPhone: '+880 17 3311 0201', driverLicense: 'DL-DHA-448201', licenseExpiry: day(420), driverExperience: 9, paramedic: 'Yes', status: 'Available', updatedAt: mins(8) },
+      { resourceId: 'AMB-202', regNo: 'DHA-HCD-202', operator: 'HeartCare Diagnostic', unitType: 'Basic life support', phone: '+880 17 1552 0042', baseFee: '৳900 base', station: 'Banani, Dhaka', lat: 23.799, lng: 90.421, driverName: 'Shamim Ahmed', driverPhone: '+880 17 3311 0202', driverLicense: 'DL-DHA-451877', licenseExpiry: day(180), driverExperience: 5, paramedic: 'No', status: 'Available', updatedAt: mins(14) },
+      { resourceId: 'AMB-203', regNo: 'DHA-CES-203', operator: 'City Emergency Service', unitType: 'ICU', phone: '+880 17 1552 0043', baseFee: '৳1,400 base', station: 'Mohakhali, Dhaka', lat: 23.783, lng: 90.414, driverName: 'Jahangir Alam', driverPhone: '+880 17 3311 0203', driverLicense: 'DL-DHA-402119', licenseExpiry: day(95), driverExperience: 12, paramedic: 'Yes', status: 'Available', updatedAt: mins(3) },
+      { resourceId: 'AMB-204', regNo: 'DHA-MET-204', operator: 'Metro General Hospital', unitType: 'Freezer', phone: '+880 17 1552 0044', baseFee: '৳2,000 base', station: 'Tejgaon, Dhaka', lat: 23.78, lng: 90.395, driverName: 'Nazrul Haque', driverPhone: '+880 17 3311 0204', driverLicense: 'DL-DHA-419063', licenseExpiry: day(-12), driverExperience: 7, paramedic: 'No', status: 'Available', updatedAt: mins(26) },
+      { resourceId: 'AMB-205', regNo: 'DHA-RES-205', operator: 'Respira Clinic', unitType: 'Basic life support', phone: '+880 17 1552 0045', baseFee: '৳900 base', station: 'Banani, Dhaka', lat: 23.797, lng: 90.403, driverName: 'Sohel Rana', driverPhone: '+880 17 3311 0205', driverLicense: 'DL-DHA-466204', licenseExpiry: day(310), driverExperience: 3, paramedic: 'No', status: 'On another trip', updatedAt: mins(5) },
+      { resourceId: 'AMB-206', regNo: 'DHA-CES-206', operator: 'City Emergency Service', unitType: 'NICU (newborn)', phone: '+880 17 1552 0046', baseFee: '৳2,200 base', station: 'Badda, Dhaka', lat: 23.788, lng: 90.426, driverName: 'Kamal Uddin', driverPhone: '+880 17 3311 0206', driverLicense: 'DL-DHA-470913', licenseExpiry: day(240), driverExperience: 6, paramedic: 'Yes', status: 'Available', updatedAt: mins(11) },
+      { resourceId: 'AMB-207', regNo: 'DHA-CES-207', operator: 'City Emergency Service', unitType: 'Patient transport', phone: '+880 17 1552 0047', baseFee: '৳700 base', station: 'Mohakhali, Dhaka', lat: 23.776, lng: 90.408, driverName: 'Belal Hossain', driverPhone: '+880 17 3311 0207', driverLicense: 'DL-DHA-482550', licenseExpiry: day(60), driverExperience: 2, paramedic: 'No', status: 'Maintenance', updatedAt: mins(320) },
+    ],
+  },
+
+  /* --------------------------------------------------- Ambulance trips */
+  {
+    key: 'ambulanceTrips',
+    label: 'Ambulance Trips',
+    icon: Route,
+    accent: accents.gold,
+    tagline: 'Dispatch & Trip Log',
+    desc: 'Patient pickups: who was dispatched, to whom, and how the trip ended.',
+    entity: 'Trip',
+    idPrefix: 'TRIP',
+    statusTones: { Dispatched: 'amber', Arrived: 'blue', Completed: 'green', Cancelled: 'rose' },
+    columns: [
+      { key: 'resourceId', label: 'ID', type: 'ref' },
+      { key: 'patient', label: 'Patient', type: 'strong' },
+      { key: 'ambulanceId', label: 'Ambulance' },
+      { key: 'operator', label: 'Operator', filter: true },
+      { key: 'pickup', label: 'Pickup' },
+      { key: 'status', label: 'Status', type: 'pill', filter: true },
+    ],
+    formFields: [
+      { key: 'patient', label: 'Patient', type: 'text', required: true },
+      { key: 'phone', label: 'Contact number', type: 'text' },
+      { key: 'ambulanceId', label: 'Ambulance', type: 'text', required: true },
+      { key: 'operator', label: 'Operator', type: 'select', options: AMBULANCE_OPERATORS },
+      { key: 'pickup', label: 'Pickup point', type: 'text', full: true },
+      { key: 'destination', label: 'Destination', type: 'text', full: true },
+      { key: 'unitType', label: 'Vehicle type', type: 'select', options: AMBULANCE_TYPES },
+      { key: 'etaMin', label: 'ETA (minutes)', type: 'number' },
+      { key: 'status', label: 'Status', type: 'select', options: ['Dispatched', 'Arrived', 'Completed', 'Cancelled'] },
+    ],
+    defaults: { status: 'Dispatched' },
+    kpis: [
+      { label: 'Live now', tone: 'amber', compute: (r) => byStatus(r, 'Dispatched', 'Arrived').toString() },
+      { label: 'Completed', tone: 'green', compute: (r) => byStatus(r, 'Completed').toString() },
+      { label: 'Cancelled', tone: 'rose', compute: (r) => byStatus(r, 'Cancelled').toString() },
+      { label: 'Trips logged', tone: 'gold', compute: (r) => r.length.toString() },
+    ],
+    actions: [
+      { key: 'arrived', label: 'Mark arrived', tone: 'blue', when: (r) => r.status === 'Dispatched', patch: () => ({ status: 'Arrived', arrivedAt: Date.now() }), toast: 'Marked as arrived at the patient' },
+      { key: 'complete', label: 'Complete', tone: 'green', when: (r) => r.status === 'Arrived' || r.status === 'Dispatched', patch: () => ({ status: 'Completed', completedAt: Date.now() }), toast: 'Trip completed' },
+    ],
+    seed: [
+      { resourceId: 'TRIP-4402', patient: 'David Chen', phone: '+1 415 555 0132', ambulanceId: 'AMB-205', operator: 'Respira Clinic', pickup: 'Banani, Dhaka', destination: 'Respira Clinic', unitType: 'Basic life support', etaMin: 6, status: 'Dispatched', requestedAt: mins(4) },
+      { resourceId: 'TRIP-4398', patient: 'Grace Wanjiru', phone: '+254 712 445 118', ambulanceId: 'AMB-203', operator: 'City Emergency Service', pickup: 'Mohakhali, Dhaka', destination: 'Metro General Hospital', unitType: 'ICU', etaMin: 9, status: 'Completed', requestedAt: mins(220), completedAt: mins(180) },
+      { resourceId: 'TRIP-4391', patient: 'James Okoro', phone: '+234 802 445 118', ambulanceId: 'AMB-206', operator: 'City Emergency Service', pickup: 'Badda, Dhaka', destination: 'Metro General Hospital', unitType: 'NICU (newborn)', etaMin: 11, status: 'Completed', requestedAt: mins(1500), completedAt: mins(1440) },
+      { resourceId: 'TRIP-4386', patient: 'Meera Iyer', phone: '+91 98 2200 4471', ambulanceId: 'AMB-203', operator: 'City Emergency Service', pickup: 'Gulshan-2, Dhaka', destination: 'Endo & Diabetes Clinic', unitType: 'ICU', etaMin: 7, status: 'Cancelled', requestedAt: mins(2900) },
     ],
   },
 

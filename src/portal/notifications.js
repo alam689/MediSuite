@@ -409,6 +409,60 @@ export function labNotifications({ awaitingSample = [], collected = [], onBench 
   return out.sort(bySeverity)
 }
 
+/* ---------------------------------------------------- Ambulance owner */
+
+/* What an operator has to be told without opening a page: a patient is
+   waiting on a vehicle, a driver's licence is about to stop being valid,
+   and a vehicle nobody has touched is sitting off the road. */
+export function ambulanceNotifications({ live = [], fleet = [], licenceWarnDays = 45, daysLeft }) {
+  const out = []
+
+  for (const t of live) {
+    out.push({
+      id: `amb-trip:${t.resourceId}`,
+      tone: t.status === 'Dispatched' ? 'amber' : 'blue',
+      title: t.status === 'Dispatched' ? `On the way — ${t.patient}` : `Arrived — ${t.patient}`,
+      sub: `${t.ambulanceId} · ${t.pickup || 'pickup not given'}${t.etaMin ? ` · ETA ${t.etaMin}m` : ''}`,
+      to: '/ambulance/trips',
+    })
+  }
+
+  for (const a of fleet) {
+    const left = daysLeft?.(a.licenseExpiry)
+    if (left === null || left === undefined) continue
+    if (left < 0) {
+      out.push({
+        id: `amb-licence:${a.resourceId}`,
+        tone: 'rose',
+        title: `Licence expired — ${a.driverName}`,
+        sub: `${a.resourceId} · ${a.regNo} · do not dispatch`,
+        to: '/ambulance/drivers',
+      })
+    } else if (left <= licenceWarnDays) {
+      out.push({
+        id: `amb-licence:${a.resourceId}`,
+        tone: 'amber',
+        title: `Licence expires in ${left}d — ${a.driverName}`,
+        sub: `${a.resourceId} · ${a.regNo}`,
+        to: '/ambulance/drivers',
+      })
+    }
+  }
+
+  for (const a of fleet) {
+    if (a.status !== 'Maintenance') continue
+    out.push({
+      id: `amb-maint:${a.resourceId}`,
+      tone: 'blue',
+      title: `Off the road — ${a.regNo}`,
+      sub: `${a.unitType} · in maintenance`,
+      to: '/ambulance/fleet',
+    })
+  }
+
+  return out.sort(bySeverity)
+}
+
 /* ----------------------------------------------------------- Hospital */
 export function hospitalNotifications({
   units = [],

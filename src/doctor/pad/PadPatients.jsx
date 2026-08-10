@@ -3,12 +3,14 @@ import { useNavigate, useParams, Link } from 'react-router-dom'
 import {
   Search, PlusCircle, RefreshCw, CircleCheck, CircleMinus, User, Pencil, X,
   BarChart3, Printer, FilePlus2, Info, Activity, CirclePlus,
+  FlaskConical, Syringe, Pill, FileText,
 } from 'lucide-react'
 import { useData } from '../../store/DataStore.jsx'
 import { useToast } from '../../components/ui/Toast.jsx'
 import { PadProvider, usePad } from './PadContext.jsx'
 import { medPrefix, padId, sectionStyle } from './padData.js'
 import { AddPatientModal } from './PatientModals.jsx'
+import RecordShelf from './RecordShelf.jsx'
 import './pad.css'
 import './padpatients.css'
 
@@ -28,6 +30,15 @@ import './padpatients.css'
    ===================================================================== */
 
 const PAGE = 25
+
+/* The record shelves carried over from the patient portal's My records, in
+   the same order the patient sees them. */
+const SHELVES = [
+  { key: 'reports', label: 'Tests & reports', icon: FlaskConical },
+  { key: 'vaccines', label: 'Vaccine history', icon: Syringe },
+  { key: 'prescriptions', label: 'Prescriptions', icon: Pill },
+  { key: 'notes', label: 'Visit notes', icon: FileText },
+]
 
 const pretty = (iso) => {
   if (!iso) return null
@@ -604,9 +615,18 @@ function PatientDetailInner() {
             <button className={tab === 'summary' ? 'on' : ''} onClick={() => setTab('summary')}>
               <BarChart3 size={15} /> Summary
             </button>
+            {/* The same shelves the patient sees in My records, so both
+                sides of the consultation are looking at one record. */}
+            {SHELVES.map((s) => (
+              <button key={s.key} className={tab === s.key ? 'on' : ''} onClick={() => setTab(s.key)}>
+                <s.icon size={15} /> {s.label}
+              </button>
+            ))}
           </div>
 
-          {tab === 'visits' ? (
+          {SHELVES.some((s) => s.key === tab) && <RecordShelf patient={patient} shelf={tab} />}
+
+          {tab === 'visits' && (
             <>
               <div className="pp-visits-head">
                 <h3>Past Visits</h3>
@@ -677,9 +697,9 @@ function PatientDetailInner() {
                 })}
               </div>
             </>
-          ) : (
-            <SummaryTab visits={visits} />
           )}
+
+          {tab === 'summary' && <SummaryTab visits={visits} />}
         </main>
       </div>
 

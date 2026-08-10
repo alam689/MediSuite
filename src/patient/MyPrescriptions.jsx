@@ -23,7 +23,10 @@ const HOLD_REASON = {
   Interaction: 'This may interact with another medicine you take. Your doctor is checking it before it can be issued.',
 }
 
-export default function MyPrescriptions({ doctorFilter = '' }) {
+/* `clinician` renders the same shelf for a doctor looking at this patient:
+   identical content, minus the one control that only makes sense from the
+   patient's side — a doctor doesn't request a refill from themselves. */
+export default function MyPrescriptions({ doctorFilter = '', clinician = false }) {
   const { me, mine } = usePatient()
   const { records } = useData()
   const toast = useToast()
@@ -115,7 +118,7 @@ export default function MyPrescriptions({ doctorFilter = '' }) {
               <button className="btn btn-ghost" onClick={() => setDetail(null)}>
                 Close
               </button>
-              {detail.status === 'Refill' && (
+              {detail.status === 'Refill' && !clinician && (
                 <button
                   className="btn btn-primary"
                   onClick={() => {

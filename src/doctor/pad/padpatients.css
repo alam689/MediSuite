@@ -114,7 +114,8 @@
   background: #fff; border-radius: 8px; box-shadow: 0 1px 6px rgba(15, 30, 60, 0.08);
   padding: 14px 20px 26px; min-height: 320px;
 }
-.pp-tabs { display: flex; gap: 22px; border-bottom: 1px solid #e3e8ee; margin-bottom: 16px; }
+/* Six tabs, so they wrap rather than run off the card on a laptop. */
+.pp-tabs { display: flex; flex-wrap: wrap; gap: 4px 22px; border-bottom: 1px solid #e3e8ee; margin-bottom: 16px; }
 .pp-tabs button {
   display: inline-flex; align-items: center; gap: 7px;
   padding: 9px 4px; font-size: 15px; color: #55636f;
@@ -280,4 +281,19 @@
   .pp-sheet-col:first-child, .pp-sheet-col:last-child { width: 100%; border-right: none; }
   .pp-details-row { grid-template-columns: 1fr; }
   .pp-details-items { grid-template-columns: 1fr; }
+}
+
+/* ---- patient-portal record shelves embedded in the doctor's view ----
+   The shelves are the patient portal's own components, so they arrive
+   styled by patient.css. Only the seam needs handling: the pad card sets
+   its own type scale, and those panels bring theme-token colours. */
+.pp-shelf {
+  font-size: 14px;
+  color: var(--text);
+}
+.pp-shelf .pt-panel {
+  margin-bottom: 14px;
+}
+.pp-shelf .pt-panel:last-child {
+  margin-bottom: 0;
 }

@@ -7,9 +7,17 @@ import {
   MapPin,
   Clock,
   RefreshCw,
+  CalendarPlus,
+  CreditCard,
+  CheckCircle2,
+  X,
 } from 'lucide-react'
-import { useData, relTime } from '../store/DataStore.jsx'
+import { useData, newId, relTime } from '../store/DataStore.jsx'
 import { CARE_UNITS, freeBeds } from '../data/schemas.js'
+import { useToast } from '../components/ui/Toast.jsx'
+import Modal from '../components/ui/Modal.jsx'
+import { Field, Select, TextInput, TextArea } from '../components/ui/Field.jsx'
+import { usePatient } from './PatientContext.jsx'
 import SearchSelect from './SearchSelect.jsx'
 
 /* =====================================================================
@@ -26,9 +34,37 @@ import SearchSelect from './SearchSelect.jsx'
    - "call to confirm" is the primary action on every card, not "reserve".
      This platform cannot hold a critical-care bed, and a button implying it
      could would be a dangerous lie.
+
+   Booking sits *beside* that call, never in front of it. A booking here is
+   a request with a deposit: it creates an admissions record the hospital
+   has to accept or decline, and it never decrements the bed count — a bed
+   this page claimed to hold, and then didn't, is the exact failure the
+   warnings above exist to prevent.
    ===================================================================== */
 
 const STALE_MINUTES = 30
+
+/* Deposit per unit, credited against the final bill. Real tariffs come from
+   the facility's service catalogue (see the departments module); these are
+   seeded so the flow has a number to carry. */
+const DEPOSIT = {
+  ICU: 400,
+  'CCU (cardiac)': 350,
+  'HDU (high dependency)': 250,
+  'NICU (newborn)': 400,
+  'PICU (paediatric)': 350,
+  'Ventilator / life support': 450,
+  Isolation: 200,
+}
+const depositFor = (unit) => DEPOSIT[unit] ?? 250
+const money = (n) => `$${n.toLocaleString()}`
+
+const ARRIVALS = ['Within the hour', 'Later today', 'Tomorrow', 'Within 3 days']
+const PAYERS = ['Self-pay', 'Insurance', 'Corporate', 'Government scheme']
+
+/* Bookings a patient can still act on — anything the hospital has moved on
+   from belongs to the admission, not to this page. */
+const LIVE_BOOKING = new Set(['Reserved', 'Admitted'])
 
 /* Availability is derived from the counts, never from a stored label, so it
    cannot contradict the numbers next to it. */
@@ -44,11 +80,23 @@ function availability(r) {
 const RANK = { open: 0, limited: 1, divert: 2, full: 3, closed: 4 }
 
 export default function BedSearch() {
-  const { records } = useData()
+  const { records, add, patch, remove } = useData()
+  const { me, name, mine } = usePatient()
+  const toast = useToast()
   const rows = records('capacity')
 
   const [hospital, setHospital] = useState('')
   const [unit, setUnit] = useState('All')
+
+  const [booking, setBooking] = useState(null) // capacity row being booked
+  const [form, setForm] = useState(null)
+  const [done, setDone] = useState(null)
+  const [cancelling, setCancelling] = useState(null)
+
+  /* This patient's own bed bookings, keyed by the capacity row they were
+     made against so a card can show its own state. */
+  const myBookings = mine('admissions').filter((a) => a.capacityId && LIVE_BOOKING.has(a.status))
+  const bookingFor = (r) => myBookings.find((a) => a.capacityId === r.resourceId)
 
   const hospitals = useMemo(
     () => [...new Set(rows.map((r) => r.hospital).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
@@ -77,6 +125,121 @@ export default function BedSearch() {
     (n, r) => n + (availability(r).key === 'open' || availability(r).key === 'limited' ? freeBeds(r) : 0),
     0
   )
+
+  const openBooking = (r) => {
+    setBooking(r)
+    setForm({
+      phone: me?.phone || '',
+      arrival: ARRIVALS[0],
+      payer: me?.insurance ? 'Insurance' : 'Self-pay',
+      reason: '',
+      payNow: true,
+    })
+  }
+
+  /* One booking writes two records, because they answer different
+     questions: admissions owns "who is asking for a bed here", billing owns
+     "what is owed for it". Both carry the other's id so neither side has to
+     guess. */
+  const confirmBooking = () => {
+    if (!booking || !form) return
+    const deposit = depositFor(booking.unit)
+    const admissionId = newId('ADM')
+    const invoiceId = newId('INV')
+
+    add(
+      'admissions',
+      {
+        resourceId: admissionId,
+        patient: name,
+        patientId: me?.resourceId,
+        hospital: booking.hospital,
+        unit: booking.unit,
+        bed: 'Not assigned',
+        doctor: '',
+        diagnosis: form.reason.trim(),
+        payer: form.payer,
+        // Requested, not held. Admissions confirms or declines it.
+        status: 'Reserved',
+        capacityId: booking.resourceId,
+        contactPhone: form.phone.trim(),
+        arrival: form.arrival,
+        depositId: invoiceId,
+        requestedAt: Date.now(),
+      },
+      {
+        title: 'Bed booking requested by patient',
+        sub: `${name} · ${booking.unit} · ${booking.hospital} · arriving ${form.arrival.toLowerCase()}`,
+      }
+    )
+
+    add(
+      'billing',
+      {
+        resourceId: invoiceId,
+        party: name,
+        // `party` is what the hospital's billing table shows; `patient` is
+        // what the patient portal joins on. Carry both.
+        patient: name,
+        patientId: me?.resourceId,
+        category: 'In-patient',
+        hospital: booking.hospital,
+        date: new Date().toISOString().slice(0, 10),
+        amount: money(deposit),
+        status: form.payNow ? 'Paid' : 'Due',
+        admissionId,
+        note: `Bed booking deposit · ${booking.unit}`,
+      },
+      {
+        title: form.payNow ? 'Bed deposit paid by patient' : 'Bed deposit invoiced',
+        sub: `${name} · ${money(deposit)} · ${booking.unit}`,
+      }
+    )
+
+    toast.success(
+      form.payNow
+        ? `Booking requested — ${money(deposit)} deposit paid`
+        : `Booking requested — ${money(deposit)} due at the hospital`,
+      { title: admissionId }
+    )
+    setDone({
+      admissionId,
+      invoiceId,
+      deposit,
+      paid: form.payNow,
+      unit: booking.unit,
+      hospital: booking.hospital,
+      phone: booking.phone,
+      arrival: form.arrival,
+    })
+    setBooking(null)
+    setForm(null)
+  }
+
+  /* Cancelling drops an unpaid deposit outright — nothing is owed for a
+     booking that never happened. A paid one stays on the account as a
+     refund line, because money that moved has to remain visible. */
+  const cancelBooking = () => {
+    const b = cancelling
+    if (!b) return
+    setCancelling(null)
+    const invoice = records('billing').find((i) => i.resourceId === b.depositId)
+    patch('admissions', b.resourceId, { status: 'Cancelled' }, {
+      title: 'Bed booking cancelled by patient',
+      sub: `${name} · ${b.unit} · ${b.hospital}`,
+    })
+    if (invoice && invoice.status !== 'Paid') {
+      remove('billing', invoice.resourceId, {
+        title: 'Bed deposit invoice voided',
+        sub: `${name} · ${invoice.amount} · booking cancelled`,
+      })
+      toast.info('Booking cancelled — nothing to pay.')
+    } else if (invoice) {
+      toast.info(`Booking cancelled — ${invoice.amount} deposit refund is with the hospital.`)
+    } else {
+      toast.info('Booking cancelled.')
+    }
+  }
 
   return (
     <>
@@ -166,11 +329,52 @@ export default function BedSearch() {
                   : `Updated ${relTime(r.updatedAt)}`}
               </div>
 
-              {r.phone && (
-                <a className="btn btn-primary bed-call" href={`tel:${r.phone.replace(/\s/g, '')}`}>
-                  <Phone size={15} /> Call to confirm
-                </a>
+              {bookingFor(r) && (
+                <div className={`bed-booked ${bookingFor(r).status === 'Admitted' ? 'ok' : ''}`}>
+                  <CheckCircle2 size={13} />
+                  <span>
+                    {bookingFor(r).status === 'Admitted'
+                      ? 'Your booking is confirmed'
+                      : 'Booking requested — waiting for the hospital'}
+                    <em>{bookingFor(r).resourceId}</em>
+                  </span>
+                </div>
               )}
+
+              <div className="bed-actions">
+                {r.phone && (
+                  <a className="btn btn-primary bed-call" href={`tel:${r.phone.replace(/\s/g, '')}`}>
+                    <Phone size={15} /> Call to confirm
+                  </a>
+                )}
+                {bookingFor(r) ? (
+                  <button
+                    className="btn btn-ghost bed-book"
+                    onClick={() => setCancelling(bookingFor(r))}
+                    disabled={bookingFor(r).status === 'Admitted'}
+                    title={
+                      bookingFor(r).status === 'Admitted'
+                        ? 'Confirmed bookings are changed by the hospital'
+                        : undefined
+                    }
+                  >
+                    <X size={14} /> Cancel booking
+                  </button>
+                ) : (
+                  <button
+                    className="btn btn-ghost bed-book"
+                    onClick={() => openBooking(r)}
+                    disabled={av.key !== 'open' && av.key !== 'limited'}
+                    title={
+                      av.key === 'open' || av.key === 'limited'
+                        ? `Deposit ${money(depositFor(r.unit))}`
+                        : 'This unit is not taking bookings right now'
+                    }
+                  >
+                    <CalendarPlus size={14} /> Book · {money(depositFor(r.unit))}
+                  </button>
+                )}
+              </div>
               <div className="bed-phone">{r.phone}</div>
             </article>
           )
@@ -190,9 +394,190 @@ export default function BedSearch() {
         <span>
           Bed numbers are reported by each facility and change minute to minute. A bed shown here may
           be taken by the time you arrive, and a unit shown as full may free one. <strong>Always
-          call before travelling</strong> — this platform cannot hold or reserve a critical-care bed.
+          call before travelling</strong> — a booking here is a request the hospital must accept, and
+          this platform cannot hold a critical-care bed on its own.
         </span>
       </p>
+
+      {/* Booking request */}
+      <Modal
+        open={!!booking}
+        onClose={() => setBooking(null)}
+        title={booking ? `Book a bed — ${booking.unit}` : ''}
+        subtitle={booking ? `${booking.hospital} · ${booking.address}` : ''}
+        width={520}
+        footer={
+          <>
+            <button className="btn btn-ghost" onClick={() => setBooking(null)}>
+              Cancel
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={confirmBooking}
+              disabled={!form?.phone.trim()}
+            >
+              {form?.payNow ? <CreditCard size={15} /> : <CalendarPlus size={15} />}
+              {form?.payNow
+                ? `Pay ${money(depositFor(booking?.unit))} & request`
+                : 'Request bed'}
+            </button>
+          </>
+        }
+      >
+        {booking && form && (
+          <>
+            <div className="bed-book-sum">
+              <div>
+                <b>{freeBeds(booking)}</b>
+                <span>beds reported free</span>
+              </div>
+              <div>
+                <b>{money(depositFor(booking.unit))}</b>
+                <span>booking deposit</span>
+              </div>
+            </div>
+
+            <div className="form-grid" style={{ marginTop: 14 }}>
+              <Field label="Contact number" required className="full">
+                <TextInput
+                  value={form.phone}
+                  onChange={(v) => setForm({ ...form, phone: v })}
+                  placeholder="The number the hospital should call back on"
+                />
+              </Field>
+              <Field label="Expected arrival">
+                <Select
+                  value={form.arrival}
+                  onChange={(v) => setForm({ ...form, arrival: v })}
+                  options={ARRIVALS}
+                />
+              </Field>
+              <Field label="Who is paying">
+                <Select
+                  value={form.payer}
+                  onChange={(v) => setForm({ ...form, payer: v })}
+                  options={PAYERS}
+                />
+              </Field>
+              <Field
+                label="Reason / referring diagnosis"
+                className="full"
+                hint="Helps the unit decide whether they are the right place for this patient."
+              >
+                <TextArea
+                  rows={2}
+                  value={form.reason}
+                  onChange={(v) => setForm({ ...form, reason: v })}
+                  placeholder="e.g. post-operative ventilation, referred by Dr. Malik"
+                />
+              </Field>
+            </div>
+
+            <div className="bed-pay">
+              <label className={form.payNow ? 'on' : ''}>
+                <input
+                  type="radio"
+                  name="bed-pay"
+                  checked={form.payNow}
+                  onChange={() => setForm({ ...form, payNow: true })}
+                />
+                <span>
+                  <b>Pay the deposit now</b>
+                  <em>Refunded in full if the hospital cannot take the booking.</em>
+                </span>
+              </label>
+              <label className={!form.payNow ? 'on' : ''}>
+                <input
+                  type="radio"
+                  name="bed-pay"
+                  checked={!form.payNow}
+                  onChange={() => setForm({ ...form, payNow: false })}
+                />
+                <span>
+                  <b>Pay at the hospital</b>
+                  <em>The deposit is invoiced to your account and due on arrival.</em>
+                </span>
+              </label>
+            </div>
+
+            <p className="bed-book-note">
+              <AlertTriangle size={13} />
+              <span>
+                This sends a request to {booking.hospital} — the bed is not held until they accept
+                it, and the free count above can change in the meantime. If the patient is
+                deteriorating now, call {booking.phone} or your emergency number instead.
+                <br />
+                <strong>Demo only:</strong> no card is collected and no money moves.
+              </span>
+            </p>
+          </>
+        )}
+      </Modal>
+
+      {/* Booking placed */}
+      <Modal
+        open={!!done}
+        onClose={() => setDone(null)}
+        title="Bed booking requested"
+        subtitle={done?.admissionId}
+        width={440}
+        footer={
+          <button className="btn btn-primary" onClick={() => setDone(null)}>
+            Done
+          </button>
+        }
+      >
+        {done && (
+          <div style={{ display: 'flex', gap: 12 }}>
+            <CheckCircle2 size={22} style={{ color: 'var(--tone-green)', flex: 'none' }} />
+            <div style={{ fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+              <strong style={{ color: 'var(--text)' }}>
+                {done.unit} · {done.hospital}
+              </strong>
+              <br />
+              Arriving {done.arrival.toLowerCase()}
+              <br />
+              Deposit {money(done.deposit)} —{' '}
+              {done.paid ? `paid (${done.invoiceId})` : `due on arrival (${done.invoiceId})`}
+              <br />
+              <br />
+              The unit has to accept this before the bed is held. Status stays{' '}
+              <strong>Reserved</strong> until they do, and you can cancel it from the card.{' '}
+              <strong style={{ color: 'var(--text)' }}>
+                Call {done.phone} if you are travelling now.
+              </strong>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Cancel confirmation */}
+      <Modal
+        open={!!cancelling}
+        onClose={() => setCancelling(null)}
+        title="Cancel this booking?"
+        subtitle={cancelling?.resourceId}
+        width={420}
+        footer={
+          <>
+            <button className="btn btn-ghost" onClick={() => setCancelling(null)}>
+              Keep booking
+            </button>
+            <button className="btn btn-ghost bed-danger" onClick={cancelBooking}>
+              Cancel booking
+            </button>
+          </>
+        }
+      >
+        {cancelling && (
+          <p style={{ fontSize: 14, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+            {cancelling.unit} at {cancelling.hospital} will be told you no longer need the bed.{' '}
+            {records('billing').find((i) => i.resourceId === cancelling.depositId)?.status === 'Paid'
+              ? 'Your deposit stays on your account until the hospital refunds it.'
+              : 'The unpaid deposit invoice is removed — you will not owe anything.'}
+          </p>
+        )}
+      </Modal>
     </>
   )
 }

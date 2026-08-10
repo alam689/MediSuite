@@ -19,14 +19,22 @@ import { useScopedIdentity } from '../auth/AuthContext.jsx'
 const PatientContext = createContext(null)
 const DEFAULT_PATIENT = 'Anika Rahman'
 
-export function PatientProvider({ children }) {
+/* `subject` pins the provider to one patient record instead of reading the
+   session. That is what lets a clinician open the patient portal's own
+   record shelves for whoever they are looking at, without forking those
+   views into a second, drifting copy. The session hook still runs — hooks
+   are unconditional — but it neither reads nor writes anything when the
+   signed-in role isn't the patient. */
+export function PatientProvider({ children, subject = null }) {
   const { records } = useData()
-  const [name, setName] = useScopedIdentity('patient', DEFAULT_PATIENT)
+  const [sessionName, setSessionName] = useScopedIdentity('patient', DEFAULT_PATIENT)
+  const name = subject?.name ?? sessionName
+  const setName = subject ? () => {} : setSessionName
 
   const all = records('patients')
   const me = useMemo(
-    () => all.find((p) => p.name === name) || all[0] || null,
-    [all, name]
+    () => (subject ? all.find((p) => p.resourceId === subject.resourceId) || subject : all.find((p) => p.name === name) || all[0] || null),
+    [all, name, subject]
   )
 
   /* Every "my ..." view filters the shared store by this identity, so

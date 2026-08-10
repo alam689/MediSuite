@@ -58,6 +58,13 @@ export const ROLES = {
     identity: 'Metro Diagnostics Lab',
     tag: 'Laboratory',
   },
+  ambulance: {
+    label: 'Ambulance owner',
+    home: '/ambulance',
+    email: 'dispatch@cityemergency.health',
+    identity: 'City Emergency Service',
+    tag: 'Ambulance operator',
+  },
   admin: {
     label: 'Administrator',
     home: '/app',

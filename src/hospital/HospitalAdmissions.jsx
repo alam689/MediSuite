@@ -16,12 +16,22 @@ import { CARE_UNITS, freeBeds } from '../data/schemas.js'
 import { localISO, prettyDate } from '../patient/helpers.js'
 
 const TONE = {
+  Reserved: 'amber',
   Admitted: 'blue',
   Observation: 'amber',
   'For discharge': 'violet',
   Discharged: 'green',
   Transferred: 'teal',
+  Declined: 'rose',
+  Cancelled: 'rose',
 }
+
+/* A patient-side bed booking arrives as Reserved: a request against a unit,
+   with nobody in a bed yet. It is deliberately kept off the ward board until
+   someone here accepts it and gives it a bed — the board is "who is in the
+   building", and a request is not a person on a ward. */
+const PENDING = 'Reserved'
+const CLOSED = ['Discharged', 'Transferred', 'Declined', 'Cancelled']
 
 const WARDS = [...CARE_UNITS, 'General ward', 'Maternity', 'Surgical ward']
 
@@ -44,17 +54,21 @@ const blank = {
    differ. */
 export default function HospitalAdmissions() {
   const { facility, facilityLabel, isAll, admissions, units, staff } = useHospital()
-  const { records, add, patch } = useData()
+  const { records, add, patch, remove } = useData()
   const toast = useToast()
 
   const [draft, setDraft] = useState(null)
   const [move, setMove] = useState(null)
+  const [accept, setAccept] = useState(null)
   const [error, setError] = useState('')
 
   const patients = records('patients')
 
-  const current = admissions.filter((a) => !['Discharged', 'Transferred'].includes(a.status))
-  const closed = admissions.filter((a) => ['Discharged', 'Transferred'].includes(a.status))
+  const current = admissions.filter(
+    (a) => !CLOSED.includes(a.status) && a.status !== PENDING
+  )
+  const closed = admissions.filter((a) => CLOSED.includes(a.status))
+  const requests = admissions.filter((a) => a.status === PENDING)
   const forDischarge = current.filter((a) => a.status === 'For discharge')
 
   /* Where the ward board and the capacity count disagree. */
@@ -103,6 +117,52 @@ export default function HospitalAdmissions() {
       { title: message, sub: `${a.resourceId} · ${a.patient}` }
     )
     toast.success(message, { title: a.patient })
+  }
+
+  /* Accepting a booking is an admission: it needs a bed like any other, so
+     the same rule applies — no bed number, no admission. */
+  const acceptBooking = () => {
+    if (!accept.bed.trim()) return setError('Give the bed a number — a held bed with no number is not a bed.')
+    const a = accept.a
+    patch(
+      'admissions',
+      a.resourceId,
+      {
+        status: 'Admitted',
+        unit: accept.unit,
+        bed: accept.bed.trim(),
+        doctor: accept.doctor,
+        admittedOn: localISO(),
+        admittedAt: Date.now(),
+      },
+      { title: 'Bed booking accepted', sub: `${a.resourceId} · ${a.patient} · ${accept.unit} ${accept.bed.trim()}` }
+    )
+    toast.success(`Bed ${accept.bed.trim()} held for ${a.patient}`, { title: a.resourceId })
+    setAccept(null)
+  }
+
+  /* Declining voids an unpaid deposit outright; a paid one stays on the
+     account so the refund the patient is owed remains visible. */
+  const declineBooking = (a) => {
+    const invoice = a.depositId
+      ? records('billing').find((i) => i.resourceId === a.depositId)
+      : null
+    patch('admissions', a.resourceId, { status: 'Declined' }, {
+      title: 'Bed booking declined',
+      sub: `${a.resourceId} · ${a.patient} · ${a.unit}`,
+    })
+    if (invoice && invoice.status !== 'Paid') {
+      remove('billing', invoice.resourceId, {
+        title: 'Bed deposit invoice voided',
+        sub: `${a.patient} · ${invoice.amount} · booking declined`,
+      })
+    }
+    toast.info(
+      invoice?.status === 'Paid'
+        ? `Declined — ${invoice.amount} deposit to refund.`
+        : 'Declined — the patient owes nothing.',
+      { title: a.patient }
+    )
   }
 
   const confirmMove = () => {
@@ -169,6 +229,61 @@ export default function HospitalAdmissions() {
         </div>
       )}
 
+      {/* Patient bed bookings waiting on a human. Above the ward board on
+          purpose: someone is asking for a bed and has already paid a
+          deposit — leaving that at the bottom of the page is how it gets
+          missed. */}
+      {requests.length > 0 && (
+        <section className="hs-panel" style={{ marginBottom: 14 }}>
+          <div className="hs-panel-head">
+            <ClipboardPlus size={15} /> Bed booking requests
+            <span className="count">{requests.length}</span>
+          </div>
+          <div className="hs-panel-body">
+            {requests.map((a) => {
+              const invoice = a.depositId
+                ? records('billing').find((i) => i.resourceId === a.depositId)
+                : null
+              const unit = units.find((u) => u.unit === a.unit && u.hospital === a.hospital)
+              const free = unit ? freeBeds(unit) : null
+              return (
+                <div className="hs-row" key={a.resourceId}>
+                  <span className="hs-dot tone-amber" />
+                  <div>
+                    <div className="hs-row-title">
+                      {a.patient} — {a.unit}
+                    </div>
+                    <div className="hs-row-sub">
+                      {a.diagnosis || 'no reason given'} · arriving{' '}
+                      {(a.arrival || 'unstated').toLowerCase()} · {a.payer}
+                      {a.contactPhone && ` · ${a.contactPhone}`}
+                      {invoice && ` · deposit ${invoice.amount} ${invoice.status.toLowerCase()}`}
+                      {free !== null && ` · ${free} free by the count`}
+                      {isAll && a.hospital && <span className="hs-site"> {a.hospital}</span>}
+                    </div>
+                  </div>
+                  <div className="hs-row-actions">
+                    <span className="pill tone-amber">Requested {relTime(a.requestedAt || Date.now())}</span>
+                    <button
+                      className="hs-btn ok"
+                      onClick={() => {
+                        setError('')
+                        setAccept({ a, unit: a.unit, bed: '', doctor: '' })
+                      }}
+                    >
+                      <CheckCircle2 size={13} /> Accept
+                    </button>
+                    <button className="hs-btn" onClick={() => declineBooking(a)}>
+                      Decline
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      )}
+
       <section className="hs-panel" style={{ marginBottom: 14 }}>
         <div className="hs-panel-head">
           <BedDouble size={15} /> On the wards
@@ -229,7 +344,7 @@ export default function HospitalAdmissions() {
 
       <section className="hs-panel">
         <div className="hs-panel-head">
-          <CheckCircle2 size={15} /> Discharged &amp; transferred
+          <CheckCircle2 size={15} /> Discharged, transferred &amp; closed bookings
           <span className="count">{closed.length}</span>
         </div>
         <div className="hs-panel-body">
@@ -372,6 +487,76 @@ export default function HospitalAdmissions() {
                 </p>
               )
             })()}
+          </>
+        )}
+      </Modal>
+
+      {/* ---- Accept a bed booking ---- */}
+      <Modal
+        open={!!accept}
+        onClose={() => setAccept(null)}
+        title="Accept bed booking"
+        subtitle={accept ? `${accept.a.patient} · ${accept.a.unit} · ${accept.a.hospital || facility}` : ''}
+        width={480}
+        footer={
+          <>
+            <button className="btn btn-ghost" onClick={() => setAccept(null)}>
+              Cancel
+            </button>
+            <button className="btn btn-primary" onClick={acceptBooking}>
+              <CheckCircle2 size={15} /> Accept &amp; hold bed
+            </button>
+          </>
+        }
+      >
+        {accept && (
+          <>
+            <div className="hs-form">
+              <label className="hs-field">
+                <span>Ward / unit</span>
+                <select
+                  className="hs-input"
+                  value={accept.unit}
+                  onChange={(e) => setAccept({ ...accept, unit: e.target.value })}
+                >
+                  {WARDS.map((w) => (
+                    <option key={w}>{w}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="hs-field">
+                <span>Bed no.</span>
+                <input
+                  className="hs-input"
+                  value={accept.bed}
+                  placeholder="e.g. ICU-04"
+                  onChange={(e) => setAccept({ ...accept, bed: e.target.value })}
+                />
+              </label>
+              <label className="hs-field full">
+                <span>Consultant</span>
+                <select
+                  className="hs-input"
+                  value={accept.doctor}
+                  onChange={(e) => setAccept({ ...accept, doctor: e.target.value })}
+                >
+                  <option value="">Unassigned</option>
+                  {staff.map((d) => (
+                    <option key={d.resourceId} value={d.name}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            {error && <span className="hs-err">{error}</span>}
+            <p className="hs-hint">
+              {accept.a.contactPhone
+                ? `Call ${accept.a.contactPhone} to confirm — the patient is told the bed is held as soon as you accept.`
+                : 'The patient is told the bed is held as soon as you accept.'}{' '}
+              This does not change the occupied count on Beds &amp; units; update it there when they
+              arrive.
+            </p>
           </>
         )}
       </Modal>
