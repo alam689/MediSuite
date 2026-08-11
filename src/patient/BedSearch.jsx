@@ -48,15 +48,15 @@ const STALE_MINUTES = 30
    the facility's service catalogue (see the departments module); these are
    seeded so the flow has a number to carry. */
 const DEPOSIT = {
-  ICU: 400,
-  'CCU (cardiac)': 350,
-  'HDU (high dependency)': 250,
-  'NICU (newborn)': 400,
-  'PICU (paediatric)': 350,
-  'Ventilator / life support': 450,
-  Isolation: 200,
+  ICU: 4500,
+  'CCU (cardiac)': 4200,
+  'HDU (high dependency)': 3500,
+  'NICU (newborn)': 5000,
+  'PICU (paediatric)': 4000,
+  'Ventilator / life support': 5000,
+  Isolation: 3000,
 }
-const depositFor = (unit) => DEPOSIT[unit] ?? 250
+const depositFor = (unit) => DEPOSIT[unit] ?? 3000
 const money = (n) => `BDT ${n.toLocaleString()}`
 
 const ARRIVALS = ['Within the hour', 'Later today', 'Tomorrow', 'Within 3 days']

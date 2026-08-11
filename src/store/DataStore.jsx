@@ -25,8 +25,12 @@ import { schemas } from '../data/schemas.js'
    v9 adds the ambulance fleet and its trip log: without a bump a returning
    browser has no vehicles, and the patient's Ambulance page — which now
    reads the fleet from here rather than a hard-coded list — would show an
-   empty map. */
-const STORAGE_KEY = 'medisuite-data-v9'
+   empty map.
+
+   v10 re-seeds after the currency switch from $ to BDT: a returning browser
+   still holds doctors, inventory and invoices with $ amounts saved under
+   the old key, and those win over the corrected seed. */
+const STORAGE_KEY = 'medisuite-data-v10'
 const DataContext = createContext(null)
 
 let idSeq = Date.now()

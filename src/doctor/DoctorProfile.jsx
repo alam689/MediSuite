@@ -170,7 +170,7 @@ export default function DoctorProfile() {
               <input
                 className="pf-input"
                 value={form.fee}
-                placeholder="BDT 120"
+                placeholder="BDT 1,000"
                 onChange={(e) => field('fee', e.target.value)}
               />
             </label>

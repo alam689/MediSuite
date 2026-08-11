@@ -46,7 +46,7 @@ export default function ChamberForm({
 }) {
   const [tab, setTab] = useState('existing') // add mode only
   const [pick, setPick] = useState('')
-  const [nw, setNw] = useState({ name: '', specialization: 'General Med', email: '', phone: '', license: '', fee: 'BDT 60' })
+  const [nw, setNw] = useState({ name: '', specialization: 'General Med', email: '', phone: '', license: '', fee: 'BDT 1,000' })
   const [days, setDays] = useState(() => new Set(parseDays(chamber?.days) || []))
   const [from, setFrom] = useState(toTimeInput(chamber?.from) || '17:00')
   const [to, setTo] = useState(toTimeInput(chamber?.to) || '21:00')

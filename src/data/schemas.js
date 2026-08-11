@@ -329,7 +329,7 @@ export const schemas = [
         ],
       },
     ],
-    defaults: { status: 'In review', specialization: 'General Med', rating: 4.5, fee: 'BDT 60', photo: '', degrees: [], awards: [], chambers: [], documents: [] },
+    defaults: { status: 'In review', specialization: 'General Med', rating: 4.5, fee: 'BDT 1,000', photo: '', degrees: [], awards: [], chambers: [], documents: [] },
     kpis: [
       { label: 'Active Doctors', tone: 'teal', compute: (r) => byStatus(r, 'Available', 'On call').toLocaleString() },
       { label: 'On Call', tone: 'green', compute: (r) => byStatus(r, 'On call').toLocaleString() },
@@ -343,7 +343,7 @@ export const schemas = [
       {
         resourceId: 'DR-2041', name: 'Dr. Sara Malik', specialization: 'Cardiology', license: 'MDC-88213',
         photo: seedPhoto('SM'),
-        email: 'sara.malik@metrogeneral.health', phone: '+880 171 552 0041', fee: 'BDT 120', rating: 4.9,
+        email: 'sara.malik@metrogeneral.health', phone: '+880 171 552 0041', fee: 'BDT 1,000', rating: 4.9,
         careerStart: '2008-07-01', status: 'Available',
         education: 'Interventional cardiologist with 16+ years in tertiary cardiac care; fellowship-trained in coronary intervention.',
         documents: [
@@ -366,7 +366,7 @@ export const schemas = [
       },
       {
         resourceId: 'DR-2039', name: 'Dr. Tunde Bello', specialization: 'Radiology', license: 'MDC-77120',
-        email: 'tunde.bello@metrogeneral.health', phone: '+234 802 445 7120', fee: 'BDT 95', rating: 4.7,
+        email: 'tunde.bello@metrogeneral.health', phone: '+234 802 445 7120', fee: 'BDT 1,000', rating: 4.7,
         careerStart: '2012-02-15', status: 'In review',
         education: 'Diagnostic radiologist focused on cross-sectional imaging and AI-assisted reporting.',
         degrees: [
@@ -378,7 +378,7 @@ export const schemas = [
       },
       {
         resourceId: 'DR-2036', name: 'Dr. Lin Wei', specialization: 'Dermatology', license: 'MDC-66540',
-        email: 'lin.wei@metrogeneral.health', phone: '+65 8120 6540', fee: 'BDT 80', rating: 4.8,
+        email: 'lin.wei@metrogeneral.health', phone: '+65 8120 6540', fee: 'BDT 1,000', rating: 4.8,
         careerStart: '2015-09-01', status: 'On call',
         education: 'Clinical & cosmetic dermatologist; special interest in teledermatology.',
         degrees: [{ degree: 'MBBS', institution: 'NUS Singapore', year: 2012 }, { degree: 'MRCP (Dermatology)', institution: 'Royal College of Physicians', year: 2017 }],
@@ -387,7 +387,7 @@ export const schemas = [
       },
       {
         resourceId: 'DR-2030', name: 'Dr. Omar Farah', specialization: 'Neurology', license: 'MDC-55901',
-        email: 'omar.farah@metrogeneral.health', phone: '+971 50 883 5901', fee: 'BDT 140', rating: 4.6,
+        email: 'omar.farah@metrogeneral.health', phone: '+971 50 883 5901', fee: 'BDT 1,000', rating: 4.6,
         careerStart: '2006-01-10', status: 'On leave',
         education: 'Consultant neurologist; stroke and epilepsy specialist.',
         degrees: [{ degree: 'MBBS', institution: 'UAE University', year: 2003 }, { degree: 'MD (Neurology)', institution: 'Cairo University', year: 2009 }],
@@ -396,7 +396,7 @@ export const schemas = [
       },
       {
         resourceId: 'DR-2028', name: 'Dr. Priya Nair', specialization: 'Endocrinology', license: 'MDC-44120',
-        email: 'priya.nair@metrogeneral.health', phone: '+91 98200 44120', fee: 'BDT 110', rating: 4.9,
+        email: 'priya.nair@metrogeneral.health', phone: '+91 98200 44120', fee: 'BDT 1,000', rating: 4.9,
         careerStart: '2010-06-20', status: 'Available',
         education: 'Endocrinologist specializing in diabetes and thyroid disorders.',
         degrees: [{ degree: 'MBBS', institution: 'AIIMS Delhi', year: 2007 }, { degree: 'DM (Endocrinology)', institution: 'PGIMER Chandigarh', year: 2013 }],
@@ -408,7 +408,7 @@ export const schemas = [
       },
       {
         resourceId: 'DR-2021', name: 'Dr. Marco Rossi', specialization: 'Pulmonology', license: 'MDC-33087',
-        email: 'marco.rossi@metrogeneral.health', phone: '+39 06 3308 7', fee: 'BDT 100', rating: 4.5,
+        email: 'marco.rossi@metrogeneral.health', phone: '+39 06 3308 7', fee: 'BDT 1,000', rating: 4.5,
         careerStart: '2013-11-05', status: 'On call',
         education: 'Pulmonologist with focus on COPD and sleep medicine.',
         degrees: [{ degree: 'MD', institution: 'Sapienza University of Rome', year: 2010 }],
