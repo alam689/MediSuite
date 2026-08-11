@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { Wallet, TrendingUp, Clock, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { useDoctor } from './DoctorContext.jsx'
-import { money, usd } from '../portal/format.js'
+import { money, bdt } from '../portal/format.js'
 import { prettyDate } from '../patient/helpers.js'
 
 const TONE = {
@@ -71,28 +71,28 @@ export default function DoctorEarnings() {
           <div className="pf-card-head">
             <CheckCircle2 size={15} /> Collected
           </div>
-          <div className="pf-card-big">{usd(totals.collected)}</div>
+          <div className="pf-card-big">{bdt(totals.collected)}</div>
           <div className="pf-card-line">{totals.counts.paid} invoice(s) settled</div>
         </div>
         <div className="pf-card">
           <div className="pf-card-head">
             <Clock size={15} /> Outstanding
           </div>
-          <div className="pf-card-big">{usd(totals.outstanding)}</div>
+          <div className="pf-card-big">{bdt(totals.outstanding)}</div>
           <div className="pf-card-line">{totals.counts.outstanding} due or overdue</div>
         </div>
         <div className="pf-card">
           <div className="pf-card-head">
             <TrendingUp size={15} /> In claim
           </div>
-          <div className="pf-card-big">{usd(totals.inClaim)}</div>
+          <div className="pf-card-big">{bdt(totals.inClaim)}</div>
           <div className="pf-card-line">{totals.counts.submitted} with insurers</div>
         </div>
         <div className="pf-card">
           <div className="pf-card-head">
             <Wallet size={15} /> Billed total
           </div>
-          <div className="pf-card-big">{usd(totals.billed)}</div>
+          <div className="pf-card-big">{bdt(totals.billed)}</div>
           <div className="pf-card-line">across {invoices.length} invoice(s)</div>
         </div>
       </section>
@@ -115,12 +115,12 @@ export default function DoctorEarnings() {
                       background: 'var(--primary)',
                       opacity: 0.85,
                     }}
-                    title={`${month}: ${usd(value)}`}
+                    title={`${month}: ${bdt(value)}`}
                   />
                   <div style={{ fontSize: 11, marginTop: 6, color: 'var(--text-muted)' }}>
                     {month.slice(5)}/{month.slice(2, 4)}
                   </div>
-                  <div style={{ fontSize: 11, fontWeight: 700 }}>{usd(value)}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700 }}>{bdt(value)}</div>
                 </div>
               ))}
             </div>

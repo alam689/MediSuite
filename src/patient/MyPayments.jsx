@@ -51,7 +51,7 @@ export default function MyPayments() {
           <div className="pt-card-head">
             <Wallet size={16} /> Outstanding
           </div>
-          <div className="pt-card-big">${total.toLocaleString()}</div>
+          <div className="pt-card-big">BDT {total.toLocaleString()}</div>
           <div className="pt-card-line muted">
             {outstanding.length === 0
               ? 'Nothing to pay right now.'

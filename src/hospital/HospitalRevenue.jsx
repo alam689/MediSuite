@@ -11,7 +11,7 @@ import {
 import { useData } from '../store/DataStore.jsx'
 import { useToast } from '../components/ui/Toast.jsx'
 import { useHospital } from './HospitalContext.jsx'
-import { money, usd } from '../portal/format.js'
+import { money, bdt } from '../portal/format.js'
 import { prettyDate } from '../patient/helpers.js'
 
 const TONE = {
@@ -82,14 +82,14 @@ export default function HospitalRevenue() {
           <div className="hs-card-head">
             <CheckCircle2 size={15} /> Collected
           </div>
-          <div className="hs-card-big">{usd(totals.collected)}</div>
+          <div className="hs-card-big">{bdt(totals.collected)}</div>
           <div className="hs-card-line">settled and banked</div>
         </div>
         <div className="hs-card">
           <div className="hs-card-head">
             <Clock size={15} /> Outstanding
           </div>
-          <div className="hs-card-big">{usd(totals.outstanding)}</div>
+          <div className="hs-card-big">{bdt(totals.outstanding)}</div>
           <div className="hs-card-line">
             {totals.overdue.length} invoice(s) overdue
           </div>
@@ -98,14 +98,14 @@ export default function HospitalRevenue() {
           <div className="hs-card-head">
             <TrendingUp size={15} /> With insurers
           </div>
-          <div className="hs-card-big">{usd(totals.inClaim)}</div>
+          <div className="hs-card-big">{bdt(totals.inClaim)}</div>
           <div className="hs-card-line">claims submitted, unpaid</div>
         </div>
         <div className="hs-card">
           <div className="hs-card-head">
             <Wallet size={15} /> Billed total
           </div>
-          <div className="hs-card-big">{usd(totals.billed)}</div>
+          <div className="hs-card-big">{bdt(totals.billed)}</div>
           <div className="hs-card-line">{invoices.length} invoice(s)</div>
         </div>
       </section>
@@ -127,7 +127,7 @@ export default function HospitalRevenue() {
                   }}
                 >
                   <span style={{ color: 'var(--text-muted)' }}>{cat}</span>
-                  <strong>{usd(value)}</strong>
+                  <strong>{bdt(value)}</strong>
                 </div>
                 <div
                   style={{
@@ -157,7 +157,7 @@ export default function HospitalRevenue() {
           <ShieldAlert size={16} />
           <span>
             <strong>{totals.flagged.length} invoice(s) under fraud review</strong> totalling{' '}
-            {usd(totals.flagged.reduce((n, i) => n + money(i.amount), 0))}. These are counted in the
+            {bdt(totals.flagged.reduce((n, i) => n + money(i.amount), 0))}. These are counted in the
             billed total and excluded from collected. They cannot be settled from this desk — the
             platform administrator clears the flag first.
           </span>

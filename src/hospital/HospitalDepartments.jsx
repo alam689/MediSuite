@@ -308,7 +308,7 @@ export default function HospitalDepartments() {
                 <input
                   className="hs-input"
                   value={s.price}
-                  placeholder="$0"
+                  placeholder="BDT 0"
                   onChange={(e) => setService(i, 'price', e.target.value)}
                 />
                 <button

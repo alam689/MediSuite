@@ -14,7 +14,7 @@ import {
 import { freeBeds } from '../data/schemas.js'
 import { useHospital } from './HospitalContext.jsx'
 import { prettyDate, upcoming } from '../patient/helpers.js'
-import { money, usd } from '../portal/format.js'
+import { money, bdt } from '../portal/format.js'
 import { hospitalNotifications } from '../portal/notifications.js'
 
 const STALE_MINUTES = 30
@@ -138,10 +138,10 @@ export default function HospitalHome() {
             <Wallet size={15} /> Collected
           </div>
           <div className="hs-card-big">
-            {usd(invoices.filter((i) => i.status === 'Paid').reduce((n, i) => n + money(i.amount), 0))}
+            {bdt(invoices.filter((i) => i.status === 'Paid').reduce((n, i) => n + money(i.amount), 0))}
           </div>
           <div className="hs-card-line">
-            {usd(
+            {bdt(
               invoices
                 .filter((i) => i.status === 'Due' || i.status === 'Overdue')
                 .reduce((n, i) => n + money(i.amount), 0)

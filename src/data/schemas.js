@@ -329,7 +329,7 @@ export const schemas = [
         ],
       },
     ],
-    defaults: { status: 'In review', specialization: 'General Med', rating: 4.5, fee: '$60', photo: '', degrees: [], awards: [], chambers: [], documents: [] },
+    defaults: { status: 'In review', specialization: 'General Med', rating: 4.5, fee: 'BDT 60', photo: '', degrees: [], awards: [], chambers: [], documents: [] },
     kpis: [
       { label: 'Active Doctors', tone: 'teal', compute: (r) => byStatus(r, 'Available', 'On call').toLocaleString() },
       { label: 'On Call', tone: 'green', compute: (r) => byStatus(r, 'On call').toLocaleString() },
@@ -343,7 +343,7 @@ export const schemas = [
       {
         resourceId: 'DR-2041', name: 'Dr. Sara Malik', specialization: 'Cardiology', license: 'MDC-88213',
         photo: seedPhoto('SM'),
-        email: 'sara.malik@metrogeneral.health', phone: '+880 171 552 0041', fee: '$120', rating: 4.9,
+        email: 'sara.malik@metrogeneral.health', phone: '+880 171 552 0041', fee: 'BDT 120', rating: 4.9,
         careerStart: '2008-07-01', status: 'Available',
         education: 'Interventional cardiologist with 16+ years in tertiary cardiac care; fellowship-trained in coronary intervention.',
         documents: [
@@ -366,7 +366,7 @@ export const schemas = [
       },
       {
         resourceId: 'DR-2039', name: 'Dr. Tunde Bello', specialization: 'Radiology', license: 'MDC-77120',
-        email: 'tunde.bello@metrogeneral.health', phone: '+234 802 445 7120', fee: '$95', rating: 4.7,
+        email: 'tunde.bello@metrogeneral.health', phone: '+234 802 445 7120', fee: 'BDT 95', rating: 4.7,
         careerStart: '2012-02-15', status: 'In review',
         education: 'Diagnostic radiologist focused on cross-sectional imaging and AI-assisted reporting.',
         degrees: [
@@ -378,7 +378,7 @@ export const schemas = [
       },
       {
         resourceId: 'DR-2036', name: 'Dr. Lin Wei', specialization: 'Dermatology', license: 'MDC-66540',
-        email: 'lin.wei@metrogeneral.health', phone: '+65 8120 6540', fee: '$80', rating: 4.8,
+        email: 'lin.wei@metrogeneral.health', phone: '+65 8120 6540', fee: 'BDT 80', rating: 4.8,
         careerStart: '2015-09-01', status: 'On call',
         education: 'Clinical & cosmetic dermatologist; special interest in teledermatology.',
         degrees: [{ degree: 'MBBS', institution: 'NUS Singapore', year: 2012 }, { degree: 'MRCP (Dermatology)', institution: 'Royal College of Physicians', year: 2017 }],
@@ -387,7 +387,7 @@ export const schemas = [
       },
       {
         resourceId: 'DR-2030', name: 'Dr. Omar Farah', specialization: 'Neurology', license: 'MDC-55901',
-        email: 'omar.farah@metrogeneral.health', phone: '+971 50 883 5901', fee: '$140', rating: 4.6,
+        email: 'omar.farah@metrogeneral.health', phone: '+971 50 883 5901', fee: 'BDT 140', rating: 4.6,
         careerStart: '2006-01-10', status: 'On leave',
         education: 'Consultant neurologist; stroke and epilepsy specialist.',
         degrees: [{ degree: 'MBBS', institution: 'UAE University', year: 2003 }, { degree: 'MD (Neurology)', institution: 'Cairo University', year: 2009 }],
@@ -396,7 +396,7 @@ export const schemas = [
       },
       {
         resourceId: 'DR-2028', name: 'Dr. Priya Nair', specialization: 'Endocrinology', license: 'MDC-44120',
-        email: 'priya.nair@metrogeneral.health', phone: '+91 98200 44120', fee: '$110', rating: 4.9,
+        email: 'priya.nair@metrogeneral.health', phone: '+91 98200 44120', fee: 'BDT 110', rating: 4.9,
         careerStart: '2010-06-20', status: 'Available',
         education: 'Endocrinologist specializing in diabetes and thyroid disorders.',
         degrees: [{ degree: 'MBBS', institution: 'AIIMS Delhi', year: 2007 }, { degree: 'DM (Endocrinology)', institution: 'PGIMER Chandigarh', year: 2013 }],
@@ -408,7 +408,7 @@ export const schemas = [
       },
       {
         resourceId: 'DR-2021', name: 'Dr. Marco Rossi', specialization: 'Pulmonology', license: 'MDC-33087',
-        email: 'marco.rossi@metrogeneral.health', phone: '+39 06 3308 7', fee: '$100', rating: 4.5,
+        email: 'marco.rossi@metrogeneral.health', phone: '+39 06 3308 7', fee: 'BDT 100', rating: 4.5,
         careerStart: '2013-11-05', status: 'On call',
         education: 'Pulmonologist with focus on COPD and sleep medicine.',
         degrees: [{ degree: 'MD', institution: 'Sapienza University of Rome', year: 2010 }],
@@ -790,15 +790,15 @@ export const schemas = [
          precedence of expiry over quantity both need a shelf that is actually
          near its date whenever the demo is opened. PH-8805 is deliberately
          past it, PH-8786 deliberately close to it. */
-      { resourceId: 'PH-8812', name: 'Atorvastatin 20mg', generic: 'Atorvastatin', branch: 'Metro General Pharmacy', batch: 'B-4410', stock: 620, reorderLevel: 120, price: '$0.35', expiry: day(210), status: 'In stock' },
-      { resourceId: 'PH-8809', name: 'Metformin 850mg', generic: 'Metformin HCl', branch: 'City Care Pharmacy', batch: 'B-4388', stock: 40, reorderLevel: 100, price: '$0.18', expiry: day(160), status: 'Delivering' },
-      { resourceId: 'PH-8805', name: 'Amoxicillin 500mg', generic: 'Amoxicillin', branch: 'Metro General Pharmacy', batch: 'B-2291', stock: 210, reorderLevel: 80, price: '$0.44', expiry: day(-5), status: 'Expiring' },
-      { resourceId: 'PH-8800', name: 'Insulin Glargine', generic: 'Insulin glargine', branch: 'Metro General Pharmacy', batch: 'B-4102', stock: 18, reorderLevel: 40, price: '$21.00', expiry: day(105), status: 'Low stock' },
-      { resourceId: 'PH-8795', name: 'Levothyroxine 75mcg', generic: 'Levothyroxine sodium', branch: 'City Care Pharmacy', batch: 'B-4055', stock: 480, reorderLevel: 100, price: '$0.12', expiry: day(300), status: 'In stock' },
-      { resourceId: 'PH-8790', name: 'Bisoprolol 5mg', generic: 'Bisoprolol fumarate', branch: 'Metro General Pharmacy', batch: 'B-4520', stock: 340, reorderLevel: 90, price: '$0.21', expiry: day(390), status: 'In stock' },
-      { resourceId: 'PH-8786', name: 'Salbutamol inhaler', generic: 'Salbutamol', branch: 'HeartCare Dispensary', batch: 'B-3311', stock: 26, reorderLevel: 30, price: '$6.80', expiry: day(38), status: 'Expiring' },
-      { resourceId: 'PH-8782', name: 'Warfarin 5mg', generic: 'Warfarin sodium', branch: 'Metro General Pharmacy', batch: 'B-4601', stock: 155, reorderLevel: 60, price: '$0.16', expiry: day(280), status: 'In stock' },
-      { resourceId: 'PH-8778', name: 'Ferrous sulfate 200mg', generic: 'Ferrous sulfate', branch: 'HeartCare Dispensary', batch: 'B-4210', stock: 410, reorderLevel: 100, price: '$0.09', expiry: day(360), status: 'In stock' },
+      { resourceId: 'PH-8812', name: 'Atorvastatin 20mg', generic: 'Atorvastatin', branch: 'Metro General Pharmacy', batch: 'B-4410', stock: 620, reorderLevel: 120, price: 'BDT 0.35', expiry: day(210), status: 'In stock' },
+      { resourceId: 'PH-8809', name: 'Metformin 850mg', generic: 'Metformin HCl', branch: 'City Care Pharmacy', batch: 'B-4388', stock: 40, reorderLevel: 100, price: 'BDT 0.18', expiry: day(160), status: 'Delivering' },
+      { resourceId: 'PH-8805', name: 'Amoxicillin 500mg', generic: 'Amoxicillin', branch: 'Metro General Pharmacy', batch: 'B-2291', stock: 210, reorderLevel: 80, price: 'BDT 0.44', expiry: day(-5), status: 'Expiring' },
+      { resourceId: 'PH-8800', name: 'Insulin Glargine', generic: 'Insulin glargine', branch: 'Metro General Pharmacy', batch: 'B-4102', stock: 18, reorderLevel: 40, price: 'BDT 21.00', expiry: day(105), status: 'Low stock' },
+      { resourceId: 'PH-8795', name: 'Levothyroxine 75mcg', generic: 'Levothyroxine sodium', branch: 'City Care Pharmacy', batch: 'B-4055', stock: 480, reorderLevel: 100, price: 'BDT 0.12', expiry: day(300), status: 'In stock' },
+      { resourceId: 'PH-8790', name: 'Bisoprolol 5mg', generic: 'Bisoprolol fumarate', branch: 'Metro General Pharmacy', batch: 'B-4520', stock: 340, reorderLevel: 90, price: 'BDT 0.21', expiry: day(390), status: 'In stock' },
+      { resourceId: 'PH-8786', name: 'Salbutamol inhaler', generic: 'Salbutamol', branch: 'HeartCare Dispensary', batch: 'B-3311', stock: 26, reorderLevel: 30, price: 'BDT 6.80', expiry: day(38), status: 'Expiring' },
+      { resourceId: 'PH-8782', name: 'Warfarin 5mg', generic: 'Warfarin sodium', branch: 'Metro General Pharmacy', batch: 'B-4601', stock: 155, reorderLevel: 60, price: 'BDT 0.16', expiry: day(280), status: 'In stock' },
+      { resourceId: 'PH-8778', name: 'Ferrous sulfate 200mg', generic: 'Ferrous sulfate', branch: 'HeartCare Dispensary', batch: 'B-4210', stock: 410, reorderLevel: 100, price: 'BDT 0.09', expiry: day(360), status: 'In stock' },
     ],
   },
 
@@ -1103,29 +1103,29 @@ export const schemas = [
     seed: [
       { resourceId: 'DEP-011', name: 'Cardiology', hospital: 'Metro General Hospital', head: 'Dr. Sara Malik', phone: 'x2201', status: 'Open',
         services: [
-          { name: 'Consultation — cardiology', code: 'CARD-01', price: '$120' },
-          { name: 'Echocardiogram', code: 'CARD-14', price: '$180' },
-          { name: 'Exercise tolerance test', code: 'CARD-22', price: '$210' },
+          { name: 'Consultation — cardiology', code: 'CARD-01', price: 'BDT 120' },
+          { name: 'Echocardiogram', code: 'CARD-14', price: 'BDT 180' },
+          { name: 'Exercise tolerance test', code: 'CARD-22', price: 'BDT 210' },
         ] },
       { resourceId: 'DEP-012', name: 'Endocrinology', hospital: 'Metro General Hospital', head: 'Dr. Priya Nair', phone: 'x2210', status: 'Open',
         services: [
-          { name: 'Consultation — endocrinology', code: 'ENDO-01', price: '$110' },
-          { name: 'Diabetes education session', code: 'ENDO-08', price: '$45' },
+          { name: 'Consultation — endocrinology', code: 'ENDO-01', price: 'BDT 110' },
+          { name: 'Diabetes education session', code: 'ENDO-08', price: 'BDT 45' },
         ] },
       { resourceId: 'DEP-013', name: 'Radiology', hospital: 'Metro Imaging Center', head: 'Dr. Tunde Bello', phone: 'x3300', status: 'Open',
         services: [
-          { name: 'Chest X-ray', code: 'RAD-02', price: '$60' },
-          { name: 'CT head (non-contrast)', code: 'RAD-31', price: '$320' },
+          { name: 'Chest X-ray', code: 'RAD-02', price: 'BDT 60' },
+          { name: 'CT head (non-contrast)', code: 'RAD-31', price: 'BDT 320' },
         ] },
       { resourceId: 'DEP-014', name: 'Pulmonology', hospital: 'Respira Clinic', head: 'Dr. Marco Rossi', phone: 'x4110', status: 'Open',
         services: [
-          { name: 'Consultation — pulmonology', code: 'PULM-01', price: '$100' },
-          { name: 'Spirometry', code: 'PULM-05', price: '$70' },
+          { name: 'Consultation — pulmonology', code: 'PULM-01', price: 'BDT 100' },
+          { name: 'Spirometry', code: 'PULM-05', price: 'BDT 70' },
         ] },
       { resourceId: 'DEP-015', name: 'Emergency', hospital: 'Metro General Hospital', head: 'Unassigned', phone: 'x9999', status: 'Limited service', notes: 'Overnight cover by on-call rota only.',
-        services: [{ name: 'Emergency attendance', code: 'ED-01', price: '$150' }] },
+        services: [{ name: 'Emergency attendance', code: 'ED-01', price: 'BDT 150' }] },
       { resourceId: 'DEP-016', name: 'Dermatology', hospital: 'SkinHealth Clinic', head: 'Dr. Lin Wei', phone: 'x5120', status: 'Open',
-        services: [{ name: 'Consultation — dermatology', code: 'DERM-01', price: '$80' }] },
+        services: [{ name: 'Consultation — dermatology', code: 'DERM-01', price: 'BDT 80' }] },
     ],
   },
 
@@ -1171,15 +1171,15 @@ export const schemas = [
     seed: [
       /* Spread across three months so the earnings and revenue charts have a
          trend to show rather than a single bar. */
-      { resourceId: 'INV-2291', party: 'Anika Rahman', category: 'Consultation', hospital: 'Metro General Hospital', doctor: 'Dr. Malik', date: day(-1), amount: '$240', status: 'Submitted' },
-      { resourceId: 'INV-2288', party: 'David Chen', category: 'Laboratory', hospital: 'Respira Clinic', doctor: 'Dr. Rossi', date: day(-3), amount: '$88', status: 'Paid' },
-      { resourceId: 'CLM-1140', party: 'Meera Iyer', category: 'Insurance', hospital: 'Endo & Diabetes Clinic', doctor: 'Dr. Nair', date: day(-10), amount: '$430', status: 'Fraud review' },
-      { resourceId: 'INV-2280', party: 'Acme Ltd', category: 'Corporate', hospital: 'Metro General Hospital', date: day(-36), amount: '$12,400', status: 'Due' },
-      { resourceId: 'INV-2275', party: 'James Okoro', category: 'Pharmacy', hospital: 'Metro General Hospital', doctor: 'Dr. Malik', date: day(-44), amount: '$54', status: 'Overdue' },
-      { resourceId: 'INV-2270', party: 'David Chen', category: 'In-patient', hospital: 'Metro General Hospital', doctor: 'Dr. Rossi', date: day(-9), amount: '$3,180', status: 'Due' },
-      { resourceId: 'INV-2266', party: 'Anika Rahman', category: 'Consultation', hospital: 'Metro General Hospital', doctor: 'Dr. Malik', date: day(-58), amount: '$120', status: 'Paid' },
-      { resourceId: 'INV-2263', party: 'Anika Rahman', category: 'Consultation', hospital: 'Metro General Hospital', doctor: 'Dr. Malik', date: day(-25), amount: '$120', status: 'Paid' },
-      { resourceId: 'INV-2261', party: 'Grace Wanjiru', category: 'Consultation', hospital: 'SkinHealth Clinic', doctor: 'Dr. Lin Wei', date: day(0), amount: '$80', status: 'Due' },
+      { resourceId: 'INV-2291', party: 'Anika Rahman', category: 'Consultation', hospital: 'Metro General Hospital', doctor: 'Dr. Malik', date: day(-1), amount: 'BDT 240', status: 'Submitted' },
+      { resourceId: 'INV-2288', party: 'David Chen', category: 'Laboratory', hospital: 'Respira Clinic', doctor: 'Dr. Rossi', date: day(-3), amount: 'BDT 88', status: 'Paid' },
+      { resourceId: 'CLM-1140', party: 'Meera Iyer', category: 'Insurance', hospital: 'Endo & Diabetes Clinic', doctor: 'Dr. Nair', date: day(-10), amount: 'BDT 430', status: 'Fraud review' },
+      { resourceId: 'INV-2280', party: 'Acme Ltd', category: 'Corporate', hospital: 'Metro General Hospital', date: day(-36), amount: 'BDT 12,400', status: 'Due' },
+      { resourceId: 'INV-2275', party: 'James Okoro', category: 'Pharmacy', hospital: 'Metro General Hospital', doctor: 'Dr. Malik', date: day(-44), amount: 'BDT 54', status: 'Overdue' },
+      { resourceId: 'INV-2270', party: 'David Chen', category: 'In-patient', hospital: 'Metro General Hospital', doctor: 'Dr. Rossi', date: day(-9), amount: 'BDT 3,180', status: 'Due' },
+      { resourceId: 'INV-2266', party: 'Anika Rahman', category: 'Consultation', hospital: 'Metro General Hospital', doctor: 'Dr. Malik', date: day(-58), amount: 'BDT 120', status: 'Paid' },
+      { resourceId: 'INV-2263', party: 'Anika Rahman', category: 'Consultation', hospital: 'Metro General Hospital', doctor: 'Dr. Malik', date: day(-25), amount: 'BDT 120', status: 'Paid' },
+      { resourceId: 'INV-2261', party: 'Grace Wanjiru', category: 'Consultation', hospital: 'SkinHealth Clinic', doctor: 'Dr. Lin Wei', date: day(0), amount: 'BDT 80', status: 'Due' },
     ],
   },
 

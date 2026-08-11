@@ -8,7 +8,7 @@ import {
   CheckCircle2,
 } from 'lucide-react'
 import { usePharmacy } from './PharmacyContext.jsx'
-import { money, usd } from '../portal/format.js'
+import { money, bdt } from '../portal/format.js'
 import { pharmacyNotifications } from '../portal/notifications.js'
 
 export default function PharmacyHome() {
@@ -75,7 +75,7 @@ export default function PharmacyHome() {
           <div className="pf-card-head">
             <Package size={15} /> Shelf value
           </div>
-          <div className="pf-card-big">{usd(shelfValue)}</div>
+          <div className="pf-card-big">{bdt(shelfValue)}</div>
           <div className="pf-card-line">
             {stock.length} line(s)
             {unpriced > 0 ? ` · ${unpriced} unpriced` : ''}

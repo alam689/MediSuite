@@ -193,8 +193,8 @@ export const content = {
     ],
     feed: [
       { title: 'AI flagged claim', sub: 'CLM-1140 · duplicate pattern', minsAgo: 11 },
-      { title: 'Payment settled', sub: 'INV-2288 · $88', minsAgo: 33 },
-      { title: 'Claim approved', sub: 'CLM-1132 · $180', minsAgo: 57 },
+      { title: 'Payment settled', sub: 'INV-2288 · BDT 88', minsAgo: 33 },
+      { title: 'Claim approved', sub: 'CLM-1132 · BDT 180', minsAgo: 57 },
       { title: 'Subscription renewed', sub: 'Clinic plan · annual', minsAgo: 130 },
     ],
   },
@@ -236,7 +236,7 @@ export const content = {
     feed: [
       { title: 'ICU demand forecast updated', sub: 'Peak 86% · 72h out', minsAgo: 10 },
       { title: 'Seasonal trend detected', sub: 'Respiratory · region A', minsAgo: 30 },
-      { title: 'Revenue milestone', sub: 'MTD crossed $4.8M', minsAgo: 60 },
+      { title: 'Revenue milestone', sub: 'MTD crossed BDT 4.8M', minsAgo: 60 },
       { title: 'Doctor workload rebalanced', sub: 'Cardiology', minsAgo: 140 },
     ],
   },

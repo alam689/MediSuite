@@ -35,7 +35,7 @@ export default function Dashboard() {
     { label: 'Total Patients', value: patients.length.toLocaleString(), delta: '+312', up: true },
     { label: 'Active Doctors', value: doctors.filter((d) => d.status === 'Available' || d.status === 'On call').length.toString(), delta: '+18', up: true },
     { label: 'Consultations', value: consults.length.toString(), delta: '+9.2%', up: true },
-    { label: 'Revenue (Today)', value: '$184.2K', delta: '+7.4%', up: true },
+    { label: 'Revenue (Today)', value: 'BDT 184.2K', delta: '+7.4%', up: true },
   ]
 
   // Priority worklist — pulled live from the highest-signal records.

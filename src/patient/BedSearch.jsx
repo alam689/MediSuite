@@ -57,7 +57,7 @@ const DEPOSIT = {
   Isolation: 200,
 }
 const depositFor = (unit) => DEPOSIT[unit] ?? 250
-const money = (n) => `$${n.toLocaleString()}`
+const money = (n) => `BDT ${n.toLocaleString()}`
 
 const ARRIVALS = ['Within the hour', 'Later today', 'Tomorrow', 'Within 3 days']
 const PAYERS = ['Self-pay', 'Insurance', 'Corporate', 'Government scheme']

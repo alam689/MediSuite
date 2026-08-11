@@ -317,7 +317,7 @@ export default function PharmacyInventory() {
                 <input
                   className="pf-input"
                   value={draft.price}
-                  placeholder="$0.35"
+                  placeholder="BDT 0.35"
                   onChange={(e) => setDraft({ ...draft, price: e.target.value })}
                 />
               </label>

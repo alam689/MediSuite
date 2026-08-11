@@ -8,7 +8,7 @@ export function firstName(full = '') {
   return parts[0] || full
 }
 
-/* Amounts are stored as display strings ("$12,400") because that is how the
+/* Amounts are stored as display strings ("BDT 12,400") because that is how the
    seed and every form writes them. Anything that adds them up has to parse
    first — and has to fail to 0 rather than NaN, or one bad row blanks a
    whole total. */
@@ -17,8 +17,8 @@ export function money(value) {
   return Number.isFinite(n) ? n : 0
 }
 
-export function usd(n) {
-  return `$${Math.round(n).toLocaleString()}`
+export function bdt(n) {
+  return `BDT ${Math.round(n).toLocaleString()}`
 }
 
 /* Turnaround time between two timestamps, as a human would say it. Returns
