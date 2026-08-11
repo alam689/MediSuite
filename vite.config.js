@@ -4,9 +4,7 @@ import react from '@vitejs/plugin-react'
 // https://vitejs.dev/config/
 export default defineConfig({
   // GitHub Pages serves the site from /<repo-name>/, not the domain root.
-  base: process.env.GITHUB_PAGES
-    ? '/AI-Powered-Telemedicine-Management-System/'
-    : '/',
+  base: process.env.GITHUB_PAGES ? '/MediSuite/' : '/',
   plugins: [react()],
   server: {
     // Honor the port assigned by the harness (PORT env), fall back to 5173.
