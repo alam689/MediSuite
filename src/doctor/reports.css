@@ -120,6 +120,84 @@
 /* toggle */
 .rp-toggle { display: flex; align-items: center; justify-content: flex-end; gap: 8px; font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--text, #27323c); }
 
+/* date field + popover picker (basic report) */
+.rp-daterow { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.rp-datepick { position: relative; }
+.rp-datefield {
+  display: inline-flex; align-items: center; gap: 9px;
+  padding: 9px 14px; border: 1px solid var(--line, #d7dde5); border-radius: 9px;
+  background: var(--panel, #fff); color: var(--text, #27323c);
+  font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer;
+}
+.rp-datefield:hover { border-color: #199a57; }
+.rp-datefield.on { border-color: #199a57; box-shadow: 0 0 0 3px rgba(25, 154, 87, 0.14); }
+.rp-datefield .rp-chev { transition: transform 0.16s ease; }
+.rp-datefield.on .rp-chev { transform: rotate(180deg); }
+.rp-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.rp-chip { font-size: 12.5px; font-weight: 600; padding: 6px 12px; border-radius: 999px; }
+.rp-chip b { margin-left: 7px; font-size: 14px; }
+.rp-chip.green { background: #e4f6ef; color: #14663f; }
+.rp-chip.blue { background: #e8f1fc; color: #22558f; }
+
+/* doubled class so the shared .rp-cal-card sizing further down can't win */
+.rp-cal-card.rp-cal-pop {
+  position: absolute; top: calc(100% + 8px); left: 0; z-index: 40;
+  width: min(700px, 88vw); max-width: none; margin: 0;
+  background: var(--panel, #fff);
+  box-shadow: 0 12px 34px rgba(20, 35, 60, 0.18);
+}
+.rp-cal-presets { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.rp-cal-presets button {
+  border: 1px solid var(--line, #d7dde5); background: var(--panel, #fff);
+  border-radius: 999px; padding: 6px 13px; font: inherit; font-size: 12.5px;
+  font-weight: 600; color: var(--text-muted, #5b6b7c); cursor: pointer;
+}
+.rp-cal-presets button:hover { border-color: #199a57; color: #199a57; }
+.rp-cal-done {
+  margin-left: auto; border: none; background: #199a57; color: #fff;
+  border-radius: 7px; padding: 7px 18px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+
+/* axis charts */
+.rp-chart { width: 100%; }
+.rp-svg { width: 100%; height: auto; display: block; }
+.rp-grid { stroke: var(--line, #e7ecf2); stroke-width: 1; }
+.rp-axis { font-size: 11px; fill: var(--text-muted, #7c8a97); }
+.rp-axis.dim { font-size: 9.5px; opacity: 0.8; }
+.rp-bar-val { font-size: 11.5px; font-weight: 700; fill: var(--text, #27323c); }
+.rp-donut { display: flex; align-items: center; gap: 20px; justify-content: center; flex-wrap: wrap; padding: 6px 0; }
+.rp-donut-val { font-size: 27px; font-weight: 700; fill: var(--text, #27323c); }
+.rp-donut-cap { font-size: 10px; letter-spacing: 0.6px; fill: var(--text-muted, #7c8a97); }
+.rp-legend.stat .rp-leg { display: grid; grid-template-columns: 13px 1fr auto; align-items: center; gap: 8px; min-width: 155px; }
+.rp-legend .rp-leg b { color: var(--text, #27323c); margin-left: 6px; }
+.rp-duo.wide { grid-template-columns: 1.5fr 1fr; }
+.rp-card-note { font-size: 12.5px; color: var(--text-muted, #7c8a97); white-space: nowrap; }
+
+/* reference-style trend block: labelled line chart + tinted data table */
+.rp-refblock { display: grid; grid-template-columns: 1.6fr 1fr; gap: 12px; align-items: start; }
+.rp-ref-title {
+  text-align: center; font-size: 17px; font-weight: 500;
+  color: var(--text-muted, #6b7a89); margin: 2px 0 4px;
+}
+.rp-zero { stroke: var(--text-muted, #9aa6b2); stroke-width: 1.2; stroke-dasharray: 6 5; }
+.rp-point-val { font-size: 12px; font-weight: 700; }
+.rp-legend.lines .rp-leg i { width: 24px; height: 3px; border-radius: 2px; }
+
+.rp-reftable {
+  background: var(--panel, #fff); border: 1px solid var(--line, #e3e8ee);
+  border-radius: 10px; box-shadow: 0 1px 4px rgba(20, 35, 60, 0.06);
+  padding: 12px; min-width: 0;
+}
+.rp-reftable-cap { text-align: center; font-size: 13.5px; font-weight: 700; padding: 6px 4px 10px; color: var(--text, #27323c); }
+.rp-reftable-scroll { max-height: 340px; overflow: auto; }
+.rp-reftable table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.rp-reftable th, .rp-reftable td {
+  border: 1px solid var(--line, #d7dde5); padding: 5px 8px; text-align: center; white-space: nowrap;
+}
+.rp-reftable thead th { position: sticky; top: 0; z-index: 1; font-weight: 700; color: #24313c; }
+.rp-reftable th.k, .rp-reftable td.k { text-align: left; font-weight: 700; background: #eef1f5; color: #24313c; }
+.rp-reftable tfoot td { font-weight: 700; background: #f6f8fa; position: sticky; bottom: 0; }
+
 /* calendar */
 .rp-cal-card {
   background: var(--panel, #fff);
@@ -146,7 +224,8 @@
 }
 .rp-cal-day:hover { background: #e8f1fc; }
 .rp-cal-day.in { background: #d4e2f2; color: #1d446e; }
-.rp-cal-day.edge { background: #2e6fd1; color: #fff; }
+.rp-cal-day.today { box-shadow: inset 0 0 0 1px #199a57; color: #199a57; font-weight: 700; }
+.rp-cal-day.edge { background: #2e6fd1; color: #fff; box-shadow: none; }
 .rp-cal-totals { display: flex; gap: 30px; align-items: center; border-top: 1px solid var(--line, #e3e8ee); margin-top: 12px; padding-top: 12px; font-size: 15px; }
 .rp-cal-totals b { font-size: 19px; margin-left: 6px; }
 .rp-cal-totals em { color: var(--text-muted, #7c8a97); font-size: 12.5px; }
@@ -164,7 +243,7 @@
 
 @media (max-width: 1020px) {
   .rp-kpis, .rp-kpis.five { grid-template-columns: repeat(2, 1fr); }
-  .rp-duo { grid-template-columns: 1fr; }
+  .rp-duo, .rp-duo.wide, .rp-refblock { grid-template-columns: 1fr; }
 }
 @media (max-width: 640px) {
   .rp-kpis, .rp-kpis.five, .rp-kpis.four, .rp-kpis.three { grid-template-columns: 1fr; }

@@ -581,32 +581,32 @@ function PatientDetailInner() {
 
   return (
     <div className="rxpad pp-page">
+      {/* Identity strip: the breadcrumb now carries the whole profile —
+          facts and both actions — so the visit timeline gets the full width. */}
       <div className="pp-crumb">
         <Link to="/doctor/rx-patients" className="pp-crumb-link"><User size={16} /> Patients</Link>
         <span className="pp-crumb-name">{patient.name}</span>
-      </div>
-
-      <div className="pp-detail">
-        <aside className="pp-profile">
-          <div className="pp-profile-card">
-            <div className="pp-profile-head">
-              <h3>{patient.name}</h3>
-              <button className="pp-edit" onClick={() => setEditing(true)}>Edit <Pencil size={13} /></button>
-            </div>
-            {patient.updatedAt && <div className="pp-updated">updated: {ago(new Date(patient.updatedAt).toISOString()).replace(/[()]/g, '')}</div>}
-            <div className="pp-facts">
-              <div><span>ID:</span><b>{patient.resourceId}</b></div>
-              <div><span>Age :</span><b>{ageText(patient.age)}</b></div>
-              <div><span>Weight :</span><b>{patient.weight ? `${patient.weight} kg` : '—'}</b></div>
-              <div><span>Phone:</span><b>{patient.phone || '—'}</b></div>
-              {patient.address && <div><span>Address:</span><b>{patient.address}</b></div>}
-            </div>
-          </div>
+        <div className="pp-crumb-facts">
+          <span><i>ID:</i> <b>{patient.resourceId}</b></span>
+          <span><i>Age:</i> <b>{ageText(patient.age)}</b></span>
+          <span><i>Weight:</i> <b>{patient.weight ? `${patient.weight} kg` : '—'}</b></span>
+          <span><i>Phone:</i> <b>{patient.phone || '—'}</b></span>
+          {patient.address && <span className="wide"><i>Address:</i> <b>{patient.address}</b></span>}
+          {patient.updatedAt && (
+            <span className="pp-crumb-updated">
+              updated: {ago(new Date(patient.updatedAt).toISOString()).replace(/[()]/g, '')}
+            </span>
+          )}
+        </div>
+        <div className="pp-crumb-acts">
+          <button className="pp-edit" onClick={() => setEditing(true)}>Edit <Pencil size={13} /></button>
           <button className="pp-write" onClick={() => goPad({ patientId: patient.resourceId })}>
             <FilePlus2 size={16} /> Write Prescription
           </button>
-        </aside>
+        </div>
+      </div>
 
+      <div className="pp-detail">
         <main className="pp-visits-card">
           <div className="pp-tabs">
             <button className={tab === 'visits' ? 'on' : ''} onClick={() => setTab('visits')}>

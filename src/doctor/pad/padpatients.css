@@ -76,39 +76,47 @@
 }
 .pp-loadmore button:hover { border-color: var(--rx-blue); }
 
-/* ---- detail ---- */
-.pp-crumb { display: flex; align-items: center; gap: 18px; padding: 2px 4px 12px; }
+/* ---- detail ----
+   The identity strip replaces the old left profile card: breadcrumb,
+   name, the patient facts as chips and both actions on one line. */
+.pp-crumb {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 2px 4px 14px;
+}
 .pp-crumb-link {
   display: inline-flex; align-items: center; gap: 7px;
   color: var(--rx-ink); font-weight: 700; font-size: 15px; text-decoration: none;
 }
 .pp-crumb-link:hover { color: var(--rx-blue); }
-.pp-crumb-name { font-size: 15px; color: var(--rx-ink); }
+.pp-crumb-name { font-size: 17px; font-weight: 700; color: var(--rx-ink); }
 
-.pp-detail { display: grid; grid-template-columns: 300px 1fr; gap: 16px; align-items: start; }
-
-.pp-profile-card {
-  background: #fff; border-radius: 8px; box-shadow: 0 1px 6px rgba(15, 30, 60, 0.08);
-  overflow: hidden; margin-bottom: 10px;
+.pp-crumb-facts { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: 1; min-width: 0; }
+.pp-crumb-facts > span {
+  display: inline-flex; align-items: baseline; gap: 6px;
+  background: #fff; border: 1px solid #e7ebf0; border-radius: 999px;
+  padding: 5px 12px; font-size: 13.5px; white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(15, 30, 60, 0.05);
 }
-.pp-profile-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 14px 16px 2px; }
-.pp-profile-head h3 { margin: 0; font-size: 19px; font-weight: 600; }
+.pp-crumb-facts i { font-style: normal; font-weight: 600; color: #6b7a89; }
+.pp-crumb-facts b { font-weight: 600; color: var(--rx-ink); }
+.pp-crumb-facts > span.wide { max-width: 320px; }
+.pp-crumb-facts > span.wide b { overflow: hidden; text-overflow: ellipsis; }
+.pp-crumb-updated {
+  background: none; border: none; box-shadow: none;
+  font-size: 12px; font-style: italic; color: #8a97a5;
+}
+
+.pp-crumb-acts { display: inline-flex; align-items: center; gap: 14px; margin-left: auto; }
 .pp-edit { display: inline-flex; align-items: center; gap: 5px; color: var(--rx-blue); font-size: 14px; font-weight: 600; flex-shrink: 0; }
 .pp-edit:hover { text-decoration: underline; }
-.pp-updated { font-size: 12px; font-style: italic; color: #8a97a5; padding: 2px 16px 8px; }
-.pp-facts { border-top: 1px solid #eef1f5; }
-.pp-facts > div {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 10px 16px; border-bottom: 1px solid #eef1f5; font-size: 14px;
-}
-.pp-facts span { font-weight: 600; }
-.pp-facts b { font-weight: 400; color: #45525e; text-align: right; }
 .pp-write {
-  display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;
-  background: #199a57; color: #fff; border-radius: 6px; padding: 12px;
-  font-size: 15px; font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  background: #199a57; color: #fff; border-radius: 6px; padding: 9px 16px;
+  font-size: 14.5px; font-weight: 600; white-space: nowrap;
 }
 .pp-write:hover { background: #0e7f45; }
+
+.pp-detail { display: block; }
 
 .pp-visits-card {
   background: #fff; border-radius: 8px; box-shadow: 0 1px 6px rgba(15, 30, 60, 0.08);
@@ -273,7 +281,7 @@
   .pp-details-items { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 860px) {
-  .pp-detail { grid-template-columns: 1fr; }
+  .pp-crumb-acts { margin-left: 0; width: 100%; justify-content: flex-end; }
   .pp-row-body { grid-template-columns: 1fr 1fr; }
   .pp-address { grid-column: auto; }
   .pp-sum-grid { grid-template-columns: 1fr; }

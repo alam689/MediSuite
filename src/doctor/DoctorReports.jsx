@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   LineChart, BarChart3, ClipboardList, DollarSign, Clipboard, Send,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, ChevronDown, CalendarDays,
 } from 'lucide-react'
 import { useDoctor } from './DoctorContext.jsx'
 import { useData } from '../store/DataStore.jsx'
@@ -43,6 +43,20 @@ const prettyDay = (k) => {
   const n = d.getDate()
   const suf = n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th'
   return `${d.toLocaleString('en', { month: 'short' })} ${n}${suf}`
+}
+
+const monthName = (ym) => new Date(`${ym}-01T00:00:00`).toLocaleString('en', { month: 'short', year: 'numeric' })
+const prettyFull = (k) => new Date(`${k}T00:00:00`).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+/* every day key from → to, inclusive (capped so a silly range can't spin) */
+const eachDay = (from, to) => {
+  const out = []
+  const d = new Date(`${from}T00:00:00`)
+  const end = new Date(`${to}T00:00:00`)
+  while (d <= end && out.length < 800) {
+    out.push(toKey(d))
+    d.setDate(d.getDate() + 1)
+  }
+  return out
 }
 
 const PERIODS = { 'Last Week': 7, 'Last Month': 30, 'Last 3 Months': 90, 'Last 6 Months': 180 }
@@ -177,6 +191,334 @@ const topN = (texts, n = 5) => {
   return [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, n)
 }
 
+/* ---- axis charts (Basic report) ------------------------------------
+   Small hand-rolled SVG chart set: a y-axis that always lands on whole
+   numbers, a multi-series line/area trend, grouped columns and a donut.
+   Everything scales through the viewBox, so the cards stay responsive.
+   ------------------------------------------------------------------ */
+const axisMax = (peak) => {
+  const target = Math.max(4, Math.ceil(peak))
+  for (const s of [1, 2, 3, 4, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2500, 5000]) {
+    if (s * 4 >= target) return s * 4
+  }
+  return Math.ceil(target / 4) * 4
+}
+
+function Legend({ series, values }) {
+  return (
+    <div className="rp-legend center">
+      {series.map((s) => (
+        <span key={s.key} className="rp-leg">
+          <i style={{ background: s.color }} /> {s.label}
+          {values && <b>{values[s.key]}</b>}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+function TrendChart({ id, points, series, height = 240 }) {
+  const W = 760
+  const padL = 40
+  const padR = 14
+  const padT = 16
+  const padB = 30
+  if (!points.length) return <p className="rp-none">No activity in this window.</p>
+  const max = axisMax(Math.max(0, ...points.flatMap((p) => series.map((s) => p.values[s.key] || 0))))
+  const n = points.length
+  const X = (i) => (n === 1 ? W / 2 : padL + (i * (W - padL - padR)) / (n - 1))
+  const Y = (v) => height - padB - (v / max) * (height - padT - padB)
+  const every = Math.max(1, Math.ceil(n / 10))
+
+  return (
+    <div className="rp-chart">
+      <svg viewBox={`0 0 ${W} ${height}`} className="rp-svg" role="img" aria-label="Trend chart">
+        <defs>
+          {series.map((s) => (
+            <linearGradient key={s.key} id={`${id}-${s.key}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={s.color} stopOpacity="0.34" />
+              <stop offset="100%" stopColor={s.color} stopOpacity="0.02" />
+            </linearGradient>
+          ))}
+        </defs>
+        {[0, 1, 2, 3, 4].map((t) => {
+          const v = (max / 4) * t
+          return (
+            <g key={t}>
+              <line x1={padL} x2={W - padR} y1={Y(v)} y2={Y(v)} className="rp-grid" />
+              <text x={padL - 8} y={Y(v) + 4} textAnchor="end" className="rp-axis">{v}</text>
+            </g>
+          )
+        })}
+        {series.map((s) => {
+          const pts = points.map((p, i) => [X(i), Y(p.values[s.key] || 0)])
+          const line = pts.map(([x, y], i) => `${i ? 'L' : 'M'} ${x} ${y}`).join(' ')
+          const area = `${line} L ${pts[n - 1][0]} ${height - padB} L ${pts[0][0]} ${height - padB} Z`
+          return (
+            <g key={s.key}>
+              <path d={area} fill={`url(#${id}-${s.key})`} />
+              <path d={line} fill="none" stroke={s.color} strokeWidth="2.4" strokeLinejoin="round" strokeLinecap="round" />
+              {pts.map(([x, y], i) => (
+                <circle key={i} cx={x} cy={y} r={n > 45 ? 2 : 3.2} fill="#fff" stroke={s.color} strokeWidth="2">
+                  <title>{`${points[i].full} — ${s.label}: ${points[i].values[s.key] || 0}`}</title>
+                </circle>
+              ))}
+            </g>
+          )
+        })}
+        {points.map((p, i) => (i % every === 0 || i === n - 1) && (
+          <text key={i} x={X(i)} y={height - 9} textAnchor="middle" className="rp-axis">{p.label}</text>
+        ))}
+      </svg>
+      <Legend series={series} />
+    </div>
+  )
+}
+
+function GroupedBars({ groups, series, height = 240 }) {
+  const W = 760
+  const padL = 40
+  const padR = 14
+  const padT = 22
+  const padB = 34
+  if (!groups.length) return <p className="rp-none">Nothing to plot yet.</p>
+  const max = axisMax(Math.max(0, ...groups.flatMap((g) => series.map((s) => g.values[s.key] || 0))))
+  const band = (W - padL - padR) / groups.length
+  const barW = Math.max(6, Math.min(48, (band * 0.6) / series.length))
+  const Y = (v) => height - padB - (v / max) * (height - padT - padB)
+
+  return (
+    <div className="rp-chart">
+      <svg viewBox={`0 0 ${W} ${height}`} className="rp-svg" role="img" aria-label="Grouped bar chart">
+        {[0, 1, 2, 3, 4].map((t) => {
+          const v = (max / 4) * t
+          return (
+            <g key={t}>
+              <line x1={padL} x2={W - padR} y1={Y(v)} y2={Y(v)} className="rp-grid" />
+              <text x={padL - 8} y={Y(v) + 4} textAnchor="end" className="rp-axis">{v}</text>
+            </g>
+          )
+        })}
+        {groups.map((g, gi) => {
+          const mid = padL + band * gi + band / 2
+          const left = mid - (barW * series.length) / 2
+          return (
+            <g key={gi}>
+              {series.map((s, si) => {
+                const v = g.values[s.key] || 0
+                const h = Math.max(v > 0 ? 3 : 0, (v / max) * (height - padT - padB))
+                return (
+                  <g key={s.key}>
+                    <rect x={left + si * barW} y={height - padB - h} width={barW - 4} height={h} rx="3" fill={s.color}>
+                      <title>{`${g.full || g.label} — ${s.label}: ${v}`}</title>
+                    </rect>
+                    {groups.length <= 14 && (
+                      <text x={left + si * barW + (barW - 4) / 2} y={height - padB - h - 6} textAnchor="middle" className="rp-bar-val">{v}</text>
+                    )}
+                  </g>
+                )
+              })}
+              <text x={mid} y={height - 12} textAnchor="middle" className="rp-axis">{g.label}</text>
+              {g.sub && <text x={mid} y={height - 1} textAnchor="middle" className="rp-axis dim">{g.sub}</text>}
+            </g>
+          )
+        })}
+      </svg>
+      <Legend series={series} />
+    </div>
+  )
+}
+
+function Donut({ data, size = 190, caption, total }) {
+  const sum = data.reduce((n, d) => n + d.value, 0)
+  const r = size / 2 - 15
+  const C = 2 * Math.PI * r
+  let acc = 0
+  return (
+    <div className="rp-donut">
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img" aria-label="Donut chart">
+        <g transform={`rotate(-90 ${size / 2} ${size / 2})`}>
+          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#eef1f5" strokeWidth="24" />
+          {sum > 0 && data.map((d, i) => {
+            const frac = d.value / sum
+            const node = (
+              <circle
+                key={i}
+                cx={size / 2} cy={size / 2} r={r} fill="none"
+                stroke={d.color} strokeWidth="24"
+                strokeDasharray={`${frac * C} ${C}`}
+                strokeDashoffset={-acc * C}
+              >
+                <title>{`${d.label}: ${d.value} (${Math.round(frac * 100)}%)`}</title>
+              </circle>
+            )
+            acc += frac
+            return node
+          })}
+        </g>
+        <text x={size / 2} y={size / 2 + 2} textAnchor="middle" className="rp-donut-val">{total ?? sum}</text>
+        <text x={size / 2} y={size / 2 + 20} textAnchor="middle" className="rp-donut-cap">{caption}</text>
+      </svg>
+      <div className="rp-legend stat">
+        {data.map((d, i) => (
+          <span key={i} className="rp-leg">
+            <i style={{ background: d.color }} /> {d.label}
+            <b>{d.value}</b>
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/* ---- reference-style trend block (Advanced report) -----------------
+   The attached reference: one titled multi-series line chart carrying a
+   bold value label on every point, a dashed zero baseline and a legend
+   of line swatches, paired with a data table whose column headers are
+   tinted to match each line.
+   ------------------------------------------------------------------ */
+const REF = {
+  orange: '#ed7d31', yellow: '#e8a800', blue: '#4472c4', green: '#70ad47',
+  red: '#c00000', teal: '#2f9e8f', grey: '#8a95a1',
+}
+
+/* Fold a day-indexed map into chart points — daily columns for a short
+   window, month columns once the period outgrows them. */
+function foldByDay(byDay, from, to, fields) {
+  if (!from || !to) return []
+  const keys = eachDay(from, to)
+  const zero = () => Object.fromEntries(fields.map((f) => [f, 0]))
+  if (keys.length <= 31) {
+    return keys.map((k) => {
+      const d = byDay.get(k) || {}
+      const values = zero()
+      for (const f of fields) values[f] = d[f] || 0
+      return { label: String(Number(k.slice(8))), full: prettyDay(k), values }
+    })
+  }
+  const m = new Map()
+  for (const k of keys) {
+    const ym = monthKey(k)
+    const g = m.get(ym) || zero()
+    const d = byDay.get(k)
+    if (d) for (const f of fields) g[f] += d[f] || 0
+    m.set(ym, g)
+  }
+  return [...m.entries()].map(([ym, values]) => ({
+    label: new Date(`${ym}-01T00:00:00`).toLocaleString('en', { month: 'short' }),
+    full: monthName(ym),
+    values,
+  }))
+}
+
+function LabeledLines({ id, title, points, series, height = 300, format = (v) => v }) {
+  const W = 900
+  const padL = 48
+  const padR = 26
+  const padT = 30
+  const padB = 54
+  if (!points.length) return <p className="rp-none">No activity in this window.</p>
+  const max = axisMax(Math.max(0, ...points.flatMap((p) => series.map((s) => p.values[s.key] || 0))))
+  const n = points.length
+  const X = (i) => (n === 1 ? W / 2 : padL + (i * (W - padL - padR)) / (n - 1))
+  const Y = (v) => height - padB - (v / max) * (height - padT - padB)
+  const withLabels = n <= 16
+  const every = Math.max(1, Math.ceil(n / 14))
+
+  return (
+    <div className="rp-chart">
+      {title && <div className="rp-ref-title">{title}</div>}
+      <svg viewBox={`0 0 ${W} ${height}`} className="rp-svg" role="img" aria-label={title || 'Trend chart'}>
+        {[1, 2, 3, 4].map((t) => (
+          <line key={t} x1={padL} x2={W - padR} y1={Y((max / 4) * t)} y2={Y((max / 4) * t)} className="rp-grid" />
+        ))}
+        {[0, 1, 2, 3, 4].map((t) => (
+          <text key={t} x={padL - 10} y={Y((max / 4) * t) + 4} textAnchor="end" className="rp-axis">
+            {format((max / 4) * t)}
+          </text>
+        ))}
+        {/* zero baseline, dashed, as in the reference */}
+        <line x1={padL} x2={W - padR} y1={Y(0)} y2={Y(0)} className="rp-zero" />
+        {series.map((s) => {
+          const pts = points.map((p, i) => [X(i), Y(p.values[s.key] || 0)])
+          const line = pts.map(([x, y], i) => `${i ? 'L' : 'M'} ${x} ${y}`).join(' ')
+          return (
+            <g key={s.key}>
+              <path d={line} fill="none" stroke={s.color} strokeWidth="2.6" strokeLinejoin="round" strokeLinecap="round" />
+              {pts.map(([x, y], i) => (
+                <circle key={i} cx={x} cy={y} r={n > 30 ? 0 : 2.6} fill={s.color}>
+                  <title>{`${points[i].full} — ${s.label}: ${format(points[i].values[s.key] || 0)}`}</title>
+                </circle>
+              ))}
+              {withLabels && pts.map(([x, y], i) => (
+                <text key={`l${i}`} x={x} y={y - 9} textAnchor="middle" className="rp-point-val" fill={s.color}>
+                  {format(points[i].values[s.key] || 0)}
+                </text>
+              ))}
+            </g>
+          )
+        })}
+        {points.map((p, i) => (i % every === 0 || i === n - 1) && (
+          <text key={i} x={X(i)} y={height - 30} textAnchor="middle" className="rp-axis">{p.label}</text>
+        ))}
+      </svg>
+      <div className="rp-legend center lines">
+        {series.map((s) => (
+          <span key={`${id}-${s.key}`} className="rp-leg"><i style={{ background: s.color }} /> {s.label}</span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function SeriesTable({ caption, points, series, format = (v) => v, periodHead = 'Period' }) {
+  if (!points.length) return null
+  return (
+    <div className="rp-reftable">
+      <div className="rp-reftable-cap">{caption}</div>
+      <div className="rp-reftable-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th className="k">{periodHead}</th>
+              {series.map((s) => (
+                <th key={s.key} style={{ background: `color-mix(in srgb, ${s.color} 24%, #fff)` }}>{s.label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {points.map((p, i) => (
+              <tr key={i}>
+                <td className="k">{p.full}</td>
+                {series.map((s) => <td key={s.key}>{format(p.values[s.key] || 0)}</td>)}
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td className="k">Total</td>
+              {series.map((s) => (
+                <td key={s.key}>{format(points.reduce((n, p) => n + (p.values[s.key] || 0), 0))}</td>
+              ))}
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+function TrendBlock({ id, title, caption, points, series, format, height }) {
+  return (
+    <div className="rp-refblock">
+      <div className="rp-card">
+        <LabeledLines id={id} title={title} points={points} series={series} format={format} height={height} />
+      </div>
+      <SeriesTable caption={caption} points={points} series={series} format={format} />
+    </div>
+  )
+}
+
 /* ---- calendar (Basic report) -------------------------------------- */
 function MonthGrid({ ym, range, onPick }) {
   const [y, m] = ym.split('-').map(Number)
@@ -184,6 +526,7 @@ function MonthGrid({ ym, range, onPick }) {
   const startDow = first.getDay()
   const days = new Date(y, m, 0).getDate()
   const cells = [...Array(startDow).fill(null), ...Array.from({ length: days }, (_, i) => i + 1)]
+  const now = todayKey()
   const inRange = (k) => range.from && range.to && k >= range.from && k <= range.to
   const isEdge = (k) => k === range.from || k === range.to
   return (
@@ -201,7 +544,7 @@ function MonthGrid({ ym, range, onPick }) {
           return (
             <button
               key={k}
-              className={`rp-cal-day ${inRange(k) ? 'in' : ''} ${isEdge(k) ? 'edge' : ''}`}
+              className={`rp-cal-day ${inRange(k) ? 'in' : ''} ${isEdge(k) ? 'edge' : ''} ${k === now ? 'today' : ''}`}
               onClick={() => onPick(k)}
             >
               {d}
@@ -213,14 +556,49 @@ function MonthGrid({ ym, range, onPick }) {
   )
 }
 
+const TREND_VIEWS = { 'Last 30 days': 30, 'Last 90 days': 90, 'Last 12 months': 365 }
+
 function BasicReport({ visits, firstSeen }) {
   const today = todayKey()
   const thisMonth = monthKey(today)
   const lastMonth = addMonths(thisMonth, -1)
   const [anchor, setAnchor] = useState(thisMonth) // right-hand month of the pair
-  const [range, setRange] = useState({ from: toKey(new Date(Date.now() - 6 * DAY_MS)), to: today })
+  /* The picker opens on demand; until then the field simply reads today. */
+  const [open, setOpen] = useState(false)
+  const [range, setRange] = useState({ from: today, to: today })
+  const [trendView, setTrendView] = useState('Last 30 days')
+  const pickRef = useRef(null)
 
-  const monthName = (ym) => new Date(`${ym}-01T00:00:00`).toLocaleString('en', { month: 'short', year: 'numeric' })
+  useEffect(() => {
+    if (!open) return undefined
+    const away = (e) => {
+      if (pickRef.current && !pickRef.current.contains(e.target)) setOpen(false)
+    }
+    const esc = (e) => e.key === 'Escape' && setOpen(false)
+    document.addEventListener('mousedown', away)
+    document.addEventListener('keydown', esc)
+    return () => {
+      document.removeEventListener('mousedown', away)
+      document.removeEventListener('keydown', esc)
+    }
+  }, [open])
+
+  /* An in-progress selection (end date not picked yet) reads as a single day. */
+  const from = range.from
+  const to = range.to || range.from
+
+  /* Day-indexed tallies — every chart below is a different cut of these. */
+  const visitByDay = useMemo(() => {
+    const m = new Map()
+    for (const v of visits) if (v.date) m.set(v.date, (m.get(v.date) || 0) + 1)
+    return m
+  }, [visits])
+
+  const newByDay = useMemo(() => {
+    const m = new Map()
+    for (const d of firstSeen.values()) if (d) m.set(d, (m.get(d) || 0) + 1)
+    return m
+  }, [firstSeen])
 
   const counts = useMemo(() => {
     const c = {
@@ -236,17 +614,52 @@ function BasicReport({ visits, firstSeen }) {
       const mk = monthKey(v.date)
       if (mk === thisMonth) c.monthVisit++
       if (mk === lastMonth) c.lastMonthVisit++
-      if (range.from && range.to && v.date >= range.from && v.date <= range.to) c.rangeVisit++
+      if (from && to && v.date >= from && v.date <= to) c.rangeVisit++
     }
     for (const d of firstSeen.values()) {
       if (d === today) c.todayPatient++
       const mk = monthKey(d)
       if (mk === thisMonth) c.monthPatient++
       if (mk === lastMonth) c.lastMonthPatient++
-      if (range.from && range.to && d >= range.from && d <= range.to) c.rangePatient++
+      if (from && to && d >= from && d <= to) c.rangePatient++
     }
     return c
-  }, [visits, firstSeen, range, today, thisMonth, lastMonth])
+  }, [visits, firstSeen, from, to, today, thisMonth, lastMonth])
+
+  /* points for a run of days — daily when the window is short, rolled up
+     into months once it grows past a month's worth of columns. */
+  const pointsFor = (a, b, forceMonthly = false) => {
+    if (!a || !b) return []
+    const keys = eachDay(a, b)
+    const daily = keys.map((k) => ({
+      label: String(Number(k.slice(8))),
+      full: prettyDay(k),
+      values: { visits: visitByDay.get(k) || 0, patients: newByDay.get(k) || 0 },
+    }))
+    if (!forceMonthly && keys.length <= 31) return daily
+    const m = new Map()
+    for (const k of keys) {
+      const ym = monthKey(k)
+      const g = m.get(ym) || { visits: 0, patients: 0 }
+      g.visits += visitByDay.get(k) || 0
+      g.patients += newByDay.get(k) || 0
+      m.set(ym, g)
+    }
+    return [...m.entries()].map(([ym, values]) => ({
+      label: new Date(`${ym}-01T00:00:00`).toLocaleString('en', { month: 'short' }),
+      full: monthName(ym),
+      values,
+    }))
+  }
+
+  const trendPoints = useMemo(() => {
+    if (trendView === 'Last 12 months') return pointsFor(`${addMonths(thisMonth, -11)}-01`, today, true)
+    const span = TREND_VIEWS[trendView]
+    return pointsFor(toKey(new Date(Date.now() - (span - 1) * DAY_MS)), today)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trendView, visitByDay, newByDay, today, thisMonth])
+
+  const rangePoints = useMemo(() => pointsFor(from, to), [from, to, visitByDay, newByDay]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const pick = (k) => {
     setRange((r) => {
@@ -256,45 +669,148 @@ function BasicReport({ visits, firstSeen }) {
     })
   }
 
-  const cards = [
-    { label: 'Total Visit', value: counts.totalVisit, tone: 'green' },
-    { label: "Today's Visit", value: counts.todayVisit, tone: 'blue' },
-    { label: "This Month's Visit", value: counts.monthVisit, sub: `(${monthName(thisMonth)})`, tone: 'violet' },
-    { label: "Last Month's Visit", value: counts.lastMonthVisit, sub: `(${monthName(lastMonth)})`, tone: 'rose' },
-    { label: 'Total Patient', value: counts.totalPatient, tone: 'green' },
-    { label: "Today's Patient", value: counts.todayPatient, tone: 'blue' },
-    { label: "This Month's Patient", value: counts.monthPatient, sub: `(${monthName(thisMonth)})`, tone: 'violet' },
-    { label: "Last Month's Patient", value: counts.lastMonthPatient, sub: `(${monthName(lastMonth)})`, tone: 'rose' },
+  const preset = (a, b) => {
+    setRange({ from: a, to: b })
+    setAnchor(monthKey(b))
+    setOpen(false)
+  }
+
+  const PRESETS = [
+    ['Today', () => preset(today, today)],
+    ['Last 7 days', () => preset(toKey(new Date(Date.now() - 6 * DAY_MS)), today)],
+    ['Last 30 days', () => preset(toKey(new Date(Date.now() - 29 * DAY_MS)), today)],
+    ['This month', () => preset(`${thisMonth}-01`, today)],
+    ['Last month', () => {
+      const [y, m] = lastMonth.split('-').map(Number)
+      preset(`${lastMonth}-01`, toKey(new Date(y, m, 0)))
+    }],
   ]
+
+  const fieldLabel = !range.to
+    ? `${prettyFull(range.from)} — pick end date…`
+    : range.from === range.to
+      ? prettyFull(range.from)
+      : `${prettyFull(range.from)} – ${prettyFull(range.to)}`
+
+  const SERIES = [
+    { key: 'visits', label: 'Visits', color: '#199a57' },
+    { key: 'patients', label: 'New patients', color: '#2e6fd1' },
+  ]
+
+  const earlierVisits = Math.max(0, counts.totalVisit - counts.monthVisit - counts.lastMonthVisit)
+  const earlierPatients = Math.max(0, counts.totalPatient - counts.monthPatient - counts.lastMonthPatient)
 
   return (
     <>
-      <div className="rp-kpis">
-        {cards.map((c) => (
-          <div key={c.label} className="rp-kpi">
-            <div className="rp-kpi-label">
-              {c.label}
-              {c.sub && <em>{c.sub}</em>}
+      {/* date control — reads today's date until the picker is opened */}
+      <div className="rp-daterow">
+        <div className="rp-datepick" ref={pickRef}>
+          <button
+            type="button"
+            className={`rp-datefield ${open ? 'on' : ''}`}
+            onClick={() => setOpen((o) => !o)}
+            aria-expanded={open}
+          >
+            <CalendarDays size={16} />
+            <span>{fieldLabel}</span>
+            <ChevronDown size={15} className="rp-chev" />
+          </button>
+
+          {open && (
+            <div className="rp-cal-card rp-cal-pop">
+              <div className="rp-cal-presets">
+                {PRESETS.map(([label, fn]) => (
+                  <button key={label} type="button" onClick={fn}>{label}</button>
+                ))}
+              </div>
+              <div className="rp-cal-nav">
+                <button type="button" onClick={() => setAnchor((a) => addMonths(a, -1))}><ChevronLeft size={17} /></button>
+                <div className="rp-cal-pair">
+                  <MonthGrid ym={addMonths(anchor, -1)} range={range} onPick={pick} />
+                  <MonthGrid ym={anchor} range={range} onPick={pick} />
+                </div>
+                <button type="button" onClick={() => setAnchor((a) => addMonths(a, 1))}><ChevronRight size={17} /></button>
+              </div>
+              <div className="rp-cal-totals">
+                <span>Total Visit: <b className="t-green">{counts.rangeVisit}</b></span>
+                <span>Total New Patients: <b className="t-blue">{counts.rangePatient}</b></span>
+                {range.from && !range.to && <em>select the end date…</em>}
+                <button type="button" className="rp-cal-done" onClick={() => setOpen(false)}>Done</button>
+              </div>
             </div>
-            <div className={`rp-kpi-big t-${c.tone}`}>{c.value}</div>
-          </div>
-        ))}
+          )}
+        </div>
+
+        <div className="rp-chips">
+          <span className="rp-chip green">Visits in range <b>{counts.rangeVisit}</b></span>
+          <span className="rp-chip blue">New patients in range <b>{counts.rangePatient}</b></span>
+        </div>
       </div>
 
-      <div className="rp-cal-card">
-        <h3>Count by date</h3>
-        <div className="rp-cal-nav">
-          <button onClick={() => setAnchor((a) => addMonths(a, -1))}><ChevronLeft size={17} /></button>
-          <div className="rp-cal-pair">
-            <MonthGrid ym={addMonths(anchor, -1)} range={range} onPick={pick} />
-            <MonthGrid ym={anchor} range={range} onPick={pick} />
-          </div>
-          <button onClick={() => setAnchor((a) => addMonths(a, 1))}><ChevronRight size={17} /></button>
+      {/* trend */}
+      <div className="rp-card">
+        <div className="rp-card-head">
+          <h4>Visit &amp; New Patient Trend</h4>
+          <select value={trendView} onChange={(e) => setTrendView(e.target.value)}>
+            {Object.keys(TREND_VIEWS).map((v) => <option key={v}>{v}</option>)}
+          </select>
         </div>
-        <div className="rp-cal-totals">
-          <span>Total Visit: <b className="t-green">{counts.rangeVisit}</b></span>
-          <span>Total New Patients: <b className="t-blue">{counts.rangePatient}</b></span>
-          {range.from && !range.to && <em>select the end date…</em>}
+        <TrendChart id="rp-trend" points={trendPoints} series={SERIES} />
+      </div>
+
+      {/* period comparison + visit share */}
+      <div className="rp-duo wide">
+        <div className="rp-card">
+          <h4>Today vs This Month vs Last Month</h4>
+          <GroupedBars
+            groups={[
+              { label: 'Today', sub: prettyDay(today), values: { visits: counts.todayVisit, patients: counts.todayPatient } },
+              { label: 'This Month', sub: monthName(thisMonth), values: { visits: counts.monthVisit, patients: counts.monthPatient } },
+              { label: 'Last Month', sub: monthName(lastMonth), values: { visits: counts.lastMonthVisit, patients: counts.lastMonthPatient } },
+            ]}
+            series={SERIES}
+          />
+        </div>
+        <div className="rp-card">
+          <h4>Total Visit — where they fall</h4>
+          <Donut
+            caption="TOTAL VISIT"
+            total={counts.totalVisit}
+            data={[
+              { label: monthName(thisMonth), value: counts.monthVisit, color: '#199a57' },
+              { label: monthName(lastMonth), value: counts.lastMonthVisit, color: '#8ec8f6' },
+              { label: 'Earlier', value: earlierVisits, color: '#cfd8dc' },
+            ]}
+          />
+        </div>
+      </div>
+
+      {/* selected range + patient share */}
+      <div className="rp-duo wide">
+        <div className="rp-card">
+          <div className="rp-card-head">
+            <h4>Count by date</h4>
+            <span className="rp-card-note">{fieldLabel}</span>
+          </div>
+          {rangePoints.length <= 14
+            ? <GroupedBars groups={rangePoints} series={SERIES} height={220} />
+            : <TrendChart id="rp-range" points={rangePoints} series={SERIES} height={220} />}
+          <div className="rp-cal-totals">
+            <span>Total Visit: <b className="t-green">{counts.rangeVisit}</b></span>
+            <span>Total New Patients: <b className="t-blue">{counts.rangePatient}</b></span>
+          </div>
+        </div>
+        <div className="rp-card">
+          <h4>Total Patient — where they arrived</h4>
+          <Donut
+            caption="TOTAL PATIENT"
+            total={counts.totalPatient}
+            data={[
+              { label: monthName(thisMonth), value: counts.monthPatient, color: '#6b4fc9' },
+              { label: monthName(lastMonth), value: counts.lastMonthPatient, color: '#b39ddb' },
+              { label: 'Earlier', value: earlierPatients, color: '#cfd8dc' },
+            ]}
+          />
         </div>
       </div>
     </>
@@ -313,7 +829,7 @@ function PeriodBar({ period, setPeriod }) {
   )
 }
 
-function AppointmentsTab({ appts }) {
+function AppointmentsTab({ appts, win }) {
   const today = todayKey()
   const [filter, setFilter] = useState('ALL')
 
@@ -335,8 +851,7 @@ function AppointmentsTab({ appts }) {
   }, [appts, today])
 
   const pct = (n) => (stats.total ? `${((n / stats.total) * 100).toFixed(2)}%` : '0%')
-  const days = [...stats.byDay.entries()].sort((a, b) => a[0].localeCompare(b[0])).slice(-14)
-  const busiest = days.reduce(
+  const busiest = [...stats.byDay.entries()].reduce(
     (best, [k, d]) => {
       const n = d.completed + d.noshow + d.cancelled
       return n > best.n ? { k, n } : best
@@ -347,15 +862,31 @@ function AppointmentsTab({ appts }) {
   const newTotal = appts.filter((a) => a.isNew).length
   const oldTotal = appts.length - newTotal
 
-  const visitParts = (d) =>
+  const points = useMemo(
+    () => foldByDay(stats.byDay, win.from, win.to, ['completed', 'noshow', 'cancelled', 'newP', 'oldP'])
+      .map((p) => ({ ...p, values: { ...p.values, total: p.values.completed + p.values.noshow + p.values.cancelled } })),
+    [stats.byDay, win]
+  )
+
+  const outcomeSeries = [
+    { key: 'total', label: 'All appointments', color: REF.blue },
+    { key: 'completed', label: 'Completed', color: REF.green },
+    { key: 'noshow', label: 'No Show', color: REF.yellow },
+    { key: 'cancelled', label: 'Cancelled', color: REF.orange },
+  ]
+
+  /* the filter strip below re-points the second chart at one outcome */
+  const visitSeries =
     filter === 'ALL'
       ? [
-          { name: 'New', value: d.newP, color: COLORS.sky },
-          { name: 'Old', value: d.oldP, color: COLORS.green },
+          { key: 'newP', label: 'New', color: REF.blue },
+          { key: 'oldP', label: 'Old', color: REF.green },
         ]
-      : [
-          { name: filter, value: d[filter === 'COMPLETED' ? 'completed' : filter === 'NO SHOW' ? 'noshow' : 'cancelled'], color: filter === 'COMPLETED' ? COLORS.green : filter === 'NO SHOW' ? COLORS.amber : COLORS.rose },
-        ]
+      : [{
+          key: filter === 'COMPLETED' ? 'completed' : filter === 'NO SHOW' ? 'noshow' : 'cancelled',
+          label: filter,
+          color: filter === 'COMPLETED' ? REF.green : filter === 'NO SHOW' ? REF.yellow : REF.orange,
+        }]
 
   return (
     <>
@@ -386,8 +917,17 @@ function AppointmentsTab({ appts }) {
         </div>
       </div>
 
+      <TrendBlock
+        id="ap-outcome"
+        title="Appointment Outcomes"
+        caption="Appointment outcomes by period"
+        points={points}
+        series={outcomeSeries}
+      />
+
       <div className="rp-duo">
         <div className="rp-card">
+          <h4>Outcome Share</h4>
           <Pie
             data={[
               { label: 'Complete', value: stats.completed, color: COLORS.green },
@@ -396,16 +936,14 @@ function AppointmentsTab({ appts }) {
             ]}
           />
         </div>
-        <div className="rp-card grow">
-          <StackedBars
-            cols={days.map(([k, d]) => ({
-              label: prettyDay(k),
-              parts: [
-                { name: 'Completed', value: d.completed, color: COLORS.green },
-                { name: 'No Show', value: d.noshow, color: COLORS.amber },
-                { name: 'Cancelled', value: d.cancelled, color: COLORS.rose },
-              ],
-            }))}
+        <div className="rp-card">
+          <h4>New vs Old Visits</h4>
+          <Pie
+            data={[
+              { label: 'New', value: newTotal, color: COLORS.sky },
+              { label: 'Old', value: oldTotal, color: COLORS.green },
+              { label: 'Report', value: 0, color: COLORS.violet },
+            ]}
           />
         </div>
       </div>
@@ -423,25 +961,18 @@ function AppointmentsTab({ appts }) {
         <span style={{ flex: 1, background: COLORS.violet }}>Report: 0</span>
       </div>
 
-      <div className="rp-duo">
-        <div className="rp-card">
-          <Pie
-            data={[
-              { label: 'New', value: newTotal, color: COLORS.sky },
-              { label: 'Old', value: oldTotal, color: COLORS.green },
-              { label: 'Report', value: 0, color: COLORS.violet },
-            ]}
-          />
-        </div>
-        <div className="rp-card grow">
-          <StackedBars cols={days.map(([k, d]) => ({ label: prettyDay(k), parts: visitParts(d) }))} />
-        </div>
-      </div>
+      <TrendBlock
+        id="ap-visits"
+        title={filter === 'ALL' ? 'New vs Old Visits' : `${filter} Visits`}
+        caption={filter === 'ALL' ? 'New vs old visits by period' : `${filter} visits by period`}
+        points={points}
+        series={visitSeries}
+      />
     </>
   )
 }
 
-function AccountsTab({ invoices, appts }) {
+function AccountsTab({ invoices, appts, win }) {
   const stats = useMemo(() => {
     const paid = invoices.filter((i) => i.status === 'Paid')
     const total = paid.reduce((n, i) => n + money(i.amount), 0)
@@ -465,8 +996,26 @@ function AccountsTab({ invoices, appts }) {
     return { total, newAmt, oldAmt, byDay }
   }, [invoices, appts])
 
-  const days = [...stats.byDay.entries()].sort((a, b) => a[0].localeCompare(b[0])).slice(-14)
   const bdt = (n) => `৳${Math.round(n).toLocaleString()}`
+
+  const points = useMemo(
+    () => foldByDay(stats.byDay, win.from, win.to, ['newAmt', 'oldAmt'])
+      .map((p) => ({
+        ...p,
+        values: {
+          newAmt: Math.round(p.values.newAmt),
+          oldAmt: Math.round(p.values.oldAmt),
+          total: Math.round(p.values.newAmt + p.values.oldAmt),
+        },
+      })),
+    [stats.byDay, win]
+  )
+
+  const series = [
+    { key: 'total', label: 'Total', color: REF.blue },
+    { key: 'newAmt', label: 'New patient', color: REF.teal },
+    { key: 'oldAmt', label: 'Old patient', color: REF.green },
+  ]
 
   return (
     <>
@@ -489,26 +1038,18 @@ function AccountsTab({ invoices, appts }) {
         </div>
       </div>
 
-      <div className="rp-card grow">
-        {days.length === 0 ? (
-          <p className="rp-none">No settled invoices in this period.</p>
-        ) : (
-          <StackedBars
-            cols={days.map(([k, d]) => ({
-              label: prettyDay(k),
-              parts: [
-                { name: 'New', value: Math.round(d.newAmt), color: COLORS.teal },
-                { name: 'Old', value: Math.round(d.oldAmt), color: COLORS.blue },
-              ],
-            }))}
-          />
-        )}
-        <div className="rp-legend center">
-          <span className="rp-leg"><i style={{ background: COLORS.teal }} /> New</span>
-          <span className="rp-leg"><i style={{ background: COLORS.blue }} /> Old</span>
-          <span className="rp-leg"><i style={{ background: COLORS.violet }} /> Report</span>
-        </div>
-      </div>
+      {stats.byDay.size === 0 ? (
+        <div className="rp-card"><p className="rp-none">No settled invoices in this period.</p></div>
+      ) : (
+        <TrendBlock
+          id="ac-collect"
+          title="Collections — New vs Old Patient"
+          caption="Collections by period (৳)"
+          points={points}
+          series={series}
+          format={bdt}
+        />
+      )}
     </>
   )
 }
@@ -755,6 +1296,11 @@ export default function DoctorReports() {
 
   /* The advanced tabs work over the selected look-back window, each
      appointment tagged new/old against the doctor's whole history. */
+  const win = useMemo(
+    () => ({ from: toKey(new Date(Date.now() - PERIODS[period] * DAY_MS)), to: todayKey() }),
+    [period]
+  )
+
   const periodAppts = useMemo(() => {
     const from = toKey(new Date(Date.now() - PERIODS[period] * DAY_MS))
     const to = todayKey()
@@ -810,8 +1356,8 @@ export default function DoctorReports() {
             ))}
           </div>
           {tab !== 'communication' && <PeriodBar period={period} setPeriod={setPeriod} />}
-          {tab === 'appointments' && <AppointmentsTab appts={periodAppts} />}
-          {tab === 'accounts' && <AccountsTab invoices={periodInvoices} appts={periodAppts} />}
+          {tab === 'appointments' && <AppointmentsTab appts={periodAppts} win={win} />}
+          {tab === 'accounts' && <AccountsTab invoices={periodInvoices} appts={periodAppts} win={win} />}
           {tab === 'patients' && (
             <PatientsTab appts={periodAppts} patients={patients} pads={periodPads} rxRecords={rxRecords} />
           )}
