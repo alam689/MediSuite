@@ -101,6 +101,9 @@
 .rp-hbar-track { background: transparent; }
 .rp-hbar-fill { height: 20px; border-radius: 0 3px 3px 0; }
 .rp-hbar-val { font-size: 12px; color: var(--text-muted, #7c8a97); }
+/* money labels outgrow the count column, so it sizes to content instead */
+.rp-hbars.money .rp-hbar-row { grid-template-columns: 110px 1fr auto; }
+.rp-hbars.money .rp-hbar-val { font-weight: 600; color: var(--text, #27323c); white-space: nowrap; }
 
 /* filters + split strip */
 .rp-filters { display: flex; justify-content: center; }
@@ -254,7 +257,9 @@
 
 .rp-meter { display: flex; flex-direction: column; gap: 6px; }
 .rp-meter-track { height: 10px; border-radius: 999px; background: #eef1f5; overflow: hidden; }
-.rp-meter-fill { height: 100%; border-radius: 999px; min-width: 3px; transition: width 0.3s ease; }
+/* No width transition: the fill is a static readout, and animating it left
+   the bar parked at the min-width floor when the period changed. */
+.rp-meter-fill { height: 100%; border-radius: 999px; min-width: 3px; }
 .rp-meter-ends { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--text-muted, #7c8a97); }
 
 .rp-kpi-sub.delta { font-weight: 600; }

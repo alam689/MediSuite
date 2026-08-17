@@ -163,17 +163,18 @@ function StackedBars({ cols, height = 210 }) {
   )
 }
 
-function HBars({ rows, color, legend }) {
+/* `format` — counts print as-is, money needs its own column width. */
+function HBars({ rows, color, legend, format }) {
   const peak = Math.max(1, ...rows.map((r) => r.value))
   return (
-    <div className="rp-hbars">
+    <div className={`rp-hbars${format ? ' money' : ''}`}>
       {rows.map((r, i) => (
         <div key={i} className="rp-hbar-row">
           <span className="rp-hbar-label" title={r.label}>{r.label}</span>
           <div className="rp-hbar-track">
             <div className="rp-hbar-fill" style={{ width: `${Math.max(2, Math.round((r.value / peak) * 100))}%`, background: color }} />
           </div>
-          <span className="rp-hbar-val">{r.value}</span>
+          <span className="rp-hbar-val">{format ? format(r.value) : r.value}</span>
         </div>
       ))}
       {legend && <div className="rp-legend center"><span className="rp-leg"><i style={{ background: color }} /> {legend}</span></div>}
@@ -331,7 +332,7 @@ function GroupedBars({ groups, series, height = 240, hideZeros = false }) {
   )
 }
 
-function Donut({ data, size = 190, caption, total }) {
+function Donut({ data, size = 190, caption, total, format = (v) => v }) {
   const sum = data.reduce((n, d) => n + d.value, 0)
   const r = size / 2 - 15
   const C = 2 * Math.PI * r
@@ -351,7 +352,7 @@ function Donut({ data, size = 190, caption, total }) {
                 strokeDasharray={`${frac * C} ${C}`}
                 strokeDashoffset={-acc * C}
               >
-                <title>{`${d.label}: ${d.value} (${Math.round(frac * 100)}%)`}</title>
+                <title>{`${d.label}: ${format(d.value)} (${Math.round(frac * 100)}%)`}</title>
               </circle>
             )
             acc += frac
@@ -365,7 +366,7 @@ function Donut({ data, size = 190, caption, total }) {
         {data.map((d, i) => (
           <span key={i} className="rp-leg">
             <i style={{ background: d.color }} /> {d.label}
-            <b>{d.value}</b>
+            <b>{format(d.value)}</b>
           </span>
         ))}
       </div>
@@ -992,10 +993,23 @@ function AppointmentsTab({ appts, win }) {
   )
 }
 
+/* Invoice states ordered settled → at risk, so the ring reads clockwise from
+   money in hand to money in trouble. */
+const ACC_STATUS = [
+  ['Paid', '#199a57'],
+  ['Submitted', '#2e6fd1'],
+  ['Due', '#d99b0a'],
+  ['Overdue', '#b3261e'],
+  ['Fraud review', '#7c4dbd'],
+]
+
 function AccountsTab({ invoices, appts, win }) {
   const stats = useMemo(() => {
     const paid = invoices.filter((i) => i.status === 'Paid')
     const total = paid.reduce((n, i) => n + money(i.amount), 0)
+    /* Everything raised in the window, not just what came back — the gap
+       between the two is the whole point of an accounts report. */
+    const billed = invoices.reduce((n, i) => n + money(i.amount), 0)
     /* Split collections by whether the payer was new to the doctor that
        day — same new/old notion as the visits report. */
     const newNames = new Set(appts.filter((a) => a.isNew).map((a) => a.patient))
@@ -1013,10 +1027,32 @@ function AccountsTab({ invoices, appts, win }) {
       else d.oldAmt += money(i.amount)
       byDay.set(i.date, d)
     }
-    return { total, newAmt, oldAmt, byDay }
+    const byStatus = new Map()
+    const byCategory = new Map()
+    for (const i of invoices) {
+      const amt = money(i.amount)
+      byStatus.set(i.status, (byStatus.get(i.status) || 0) + amt)
+      const c = i.category || 'Uncategorised'
+      byCategory.set(c, (byCategory.get(c) || 0) + amt)
+    }
+    return { total, billed, newAmt, oldAmt, byDay, byStatus, byCategory }
   }, [invoices, appts])
 
   const bdt = (n) => `৳${Math.round(n).toLocaleString()}`
+  /* The donut centre and the bar rail are too narrow for a full figure. */
+  const bdtShort = (n) =>
+    n >= 100000 ? `৳${(n / 100000).toFixed(1)}L` : n >= 1000 ? `৳${(n / 1000).toFixed(1)}k` : `৳${Math.round(n)}`
+
+  const outstanding = stats.billed - stats.total
+  const rate = stats.billed > 0 ? (stats.total / stats.billed) * 100 : 0
+  const share = (n) => (stats.total > 0 ? `${Math.round((n / stats.total) * 100)}% of collections` : 'No collections yet')
+
+  const statusData = ACC_STATUS
+    .map(([label, color]) => ({ label, value: Math.round(stats.byStatus.get(label) || 0), color }))
+    .filter((d) => d.value > 0)
+  const catRows = [...stats.byCategory.entries()]
+    .map(([label, value]) => ({ label, value: Math.round(value) }))
+    .sort((a, b) => b.value - a.value)
 
   const points = useMemo(
     () => foldByDay(stats.byDay, win.from, win.to, ['newAmt', 'oldAmt'])
@@ -1039,27 +1075,66 @@ function AccountsTab({ invoices, appts, win }) {
 
   return (
     <>
-      <div className="rp-kpis four">
-        <div className="rp-kpi head-tinted" style={{ '--tint': COLORS.green }}>
-          <div className="rp-kpi-label">Total Collections</div>
-          <div className="rp-kpi-big">{bdt(stats.total)}</div>
+      <div className="rp-card rp-quota">
+        <div className="rp-quota-top">
+          <div>
+            <div className="rp-quota-cap">COLLECTED THIS PERIOD</div>
+            <div className="rp-quota-hero">{bdt(stats.total)}</div>
+          </div>
+          <div className="rp-quota-facts">
+            <span><em>Billed</em><b>{bdt(stats.billed)}</b></span>
+            <span><em>Outstanding</em><b>{bdt(outstanding)}</b></span>
+            <span><em>Collected</em><b>{stats.billed > 0 ? `${rate.toFixed(0)}%` : '—'}</b></span>
+          </div>
         </div>
-        <div className="rp-kpi head-tinted" style={{ '--tint': COLORS.teal }}>
-          <div className="rp-kpi-label">New Patient</div>
+        <Meter value={stats.total} max={stats.billed} color="#199a57" ticks={['৳0', bdt(stats.billed)]} />
+      </div>
+
+      <div className="rp-duo">
+        <div className="rp-card">
+          <div className="rp-card-head">
+            <h4>Billing by category</h4>
+            <span className="rp-card-note">Amount invoiced</span>
+          </div>
+          {catRows.length ? (
+            <HBars rows={catRows} color="#2f6f6a" legend="Invoiced (৳)" format={bdt} />
+          ) : (
+            <p className="rp-none">Nothing invoiced in this period.</p>
+          )}
+        </div>
+        <div className="rp-card">
+          <div className="rp-card-head">
+            <h4>Where the money sits</h4>
+            <span className="rp-card-note">By invoice state</span>
+          </div>
+          {statusData.length ? (
+            <Donut data={statusData} total={bdtShort(stats.billed)} caption="BILLED" format={bdtShort} />
+          ) : (
+            <p className="rp-none">Nothing invoiced in this period.</p>
+          )}
+        </div>
+      </div>
+
+      <div className="rp-kpis three">
+        <div className="rp-kpi">
+          <div className="rp-kpi-label caps">NEW PATIENT</div>
           <div className="rp-kpi-big">{bdt(stats.newAmt)}</div>
+          <div className="rp-kpi-sub">{share(stats.newAmt)}</div>
         </div>
-        <div className="rp-kpi head-tinted" style={{ '--tint': COLORS.blue }}>
-          <div className="rp-kpi-label">Old Patient</div>
+        <div className="rp-kpi">
+          <div className="rp-kpi-label caps">OLD PATIENT</div>
           <div className="rp-kpi-big">{bdt(stats.oldAmt)}</div>
+          <div className="rp-kpi-sub">{share(stats.oldAmt)}</div>
         </div>
-        <div className="rp-kpi head-tinted" style={{ '--tint': COLORS.violet }}>
-          <div className="rp-kpi-label">Report Patient</div>
+        <div className="rp-kpi">
+          <div className="rp-kpi-label caps">REPORT PATIENT</div>
           <div className="rp-kpi-big">৳0</div>
+          <div className="rp-kpi-sub">Not billed as its own category</div>
         </div>
       </div>
 
       {stats.byDay.size === 0 ? (
-        <div className="rp-card"><p className="rp-none">No settled invoices in this period.</p></div>
+        <div className="rp-card"><p className="rp-none">No settled invoices in this period — nothing to plot over time yet.</p></div>
       ) : (
         <TrendBlock
           id="ac-collect"
