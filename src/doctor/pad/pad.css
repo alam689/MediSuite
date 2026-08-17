@@ -11,8 +11,11 @@
   --rx-maroon: #a01a1a;
   --rx-blue: #1d6fd6;
   --rx-blue-dark: #164e8f;
-  --rx-green: #74ceac;
-  --rx-green-dark: #2ea87c;
+  /* The action bar's green is the brand mark's, held as a fixed value like
+     the rest of the pad palette: the bar sits under a backdrop-filter, and
+     a themed var() there survives a reload but not a live theme toggle. */
+  --rx-green: #2f6f6a;
+  --rx-green-dark: #265c58;
   --rx-line: #d7dde5;
   --rx-shadow: 0 10px 40px rgba(15, 30, 60, 0.22);
   font-family: 'Segoe UI', 'Noto Sans Bengali', system-ui, sans-serif;

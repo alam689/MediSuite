@@ -275,7 +275,9 @@ function TrendChart({ id, points, series, height = 240 }) {
   )
 }
 
-function GroupedBars({ groups, series, height = 240 }) {
+/* `hideZeros` — on a sparse chart a "0" over every empty slot is noise, so
+   the caller can drop the label where there is no bar to label. */
+function GroupedBars({ groups, series, height = 240, hideZeros = false }) {
   const W = 760
   const padL = 40
   const padR = 14
@@ -312,7 +314,7 @@ function GroupedBars({ groups, series, height = 240 }) {
                     <rect x={left + si * barW} y={height - padB - h} width={barW - 4} height={h} rx="3" fill={s.color}>
                       <title>{`${g.full || g.label} — ${s.label}: ${v}`}</title>
                     </rect>
-                    {groups.length <= 14 && (
+                    {groups.length <= 14 && !(hideZeros && v === 0) && (
                       <text x={left + si * barW + (barW - 4) / 2} y={height - padB - h - 6} textAnchor="middle" className="rp-bar-val">{v}</text>
                     )}
                   </g>
@@ -366,6 +368,24 @@ function Donut({ data, size = 190, caption, total }) {
             <b>{d.value}</b>
           </span>
         ))}
+      </div>
+    </div>
+  )
+}
+
+/* A single ratio against a limit reads as a meter, not a two-slice pie.
+   A used share far below 1% would render as nothing, so the fill keeps a
+   hairline once anything at all has been spent. */
+function Meter({ value, max, color, ticks }) {
+  const pct = max > 0 ? (value / max) * 100 : 0
+  const width = value > 0 ? Math.max(pct, 0.7) : 0
+  return (
+    <div className="rp-meter">
+      <div className="rp-meter-track" title={`${value.toLocaleString()} of ${max.toLocaleString()} used`}>
+        <div className="rp-meter-fill" style={{ width: `${width}%`, background: color }} />
+      </div>
+      <div className="rp-meter-ends">
+        {ticks.map((t, i) => <span key={i}>{t}</span>)}
       </div>
     </div>
   )
@@ -1197,6 +1217,12 @@ function PatientsTab({ appts, patients, pads, rxRecords }) {
 }
 
 const SMS_QUOTA = 23000
+/* Two channels the reader must tell apart, so: categorical, at ink strength
+   rather than the pastel fills — the pale set fails contrast against the
+   card. The recency ramp is one hue, dark = most recent. */
+const SMS_INK = { reminder: '#2e6fd1', followup: '#199a57' }
+const RECENCY = ['#0f5f3a', '#199a57', '#6ec59b']
+const shortMonth = (ym) => new Date(`${ym}-01T00:00:00`).toLocaleString('en', { month: 'short' })
 
 function CommunicationTab({ allAppts, pads }) {
   const [view, setView] = useState('overall')
@@ -1209,42 +1235,123 @@ function CommunicationTab({ allAppts, pads }) {
      against a fixed quota — there is no SMS gateway behind this. */
   const reminders = allAppts.filter((a) => a.status === 'Confirmed' || a.status === 'Checked-in')
   const fuTexts = pads.filter((s) => (s.items?.followup || []).length > 0)
-  const rows = view === 'overall' ? reminders.map((a) => a.date) : fuTexts.map((s) => String(s.date || '').slice(0, 10))
-  const used = view === 'overall' ? reminders.length + fuTexts.length : fuTexts.length
+  const remDates = reminders.map((a) => a.date)
+  const fuDates = fuTexts.map((s) => String(s.date || '').slice(0, 10))
+  const rows = view === 'overall' ? [...remDates, ...fuDates] : fuDates
+  const used = rows.length
+  const remaining = SMS_QUOTA - used
 
+  const inMonth = (dates, ym) => dates.filter((d) => monthKey(d || '') === ym).length
   const sentToday = rows.filter((d) => d === today).length
-  const sentMonth = rows.filter((d) => monthKey(d || '') === thisMonth).length
-  const sentLast = rows.filter((d) => monthKey(d || '') === lastMonth).length
+  const sentMonth = inMonth(rows, thisMonth)
+  const sentLast = inMonth(rows, lastMonth)
+  const delta = sentMonth - sentLast
 
-  const cards = [
-    ['TOTAL AVAILED SMS', SMS_QUOTA],
-    ['TOTAL SMS USED', used],
-    ['REMAINING SMS', SMS_QUOTA - used],
-    ['SMS SENT TODAY', sentToday],
-    ['SMS SENT THIS MONTH', sentMonth],
-    ['SMS SENT LAST MONTH', sentLast],
-  ]
+  const pct = (used / SMS_QUOTA) * 100
+  const pctText = used === 0 ? '0' : pct < 1 ? pct.toFixed(2) : pct.toFixed(1)
+
+  /* Six months of columns — the month tiles alone can't show whether the
+     load is climbing, so the same numbers get a time axis. */
+  const months = []
+  for (let i = 5; i >= 0; i--) months.push(addMonths(thisMonth, -i))
+  const series =
+    view === 'overall'
+      ? [
+          { key: 'reminder', label: 'Reminder texts', color: SMS_INK.reminder },
+          { key: 'followup', label: 'Follow-up texts', color: SMS_INK.followup },
+        ]
+      : [{ key: 'followup', label: 'Follow-up texts', color: SMS_INK.followup }]
+  const groups = months.map((ym, i) => ({
+    label: shortMonth(ym),
+    sub: i === 0 || ym.endsWith('-01') ? ym.slice(0, 4) : '',
+    full: monthName(ym),
+    values: { reminder: inMonth(remDates, ym), followup: inMonth(fuDates, ym) },
+  }))
+
+  /* Overall traffic splits by channel; the follow-up view has only one
+     channel, so it splits by recency instead. */
+  const split =
+    view === 'overall'
+      ? [
+          { label: 'Reminder texts', value: reminders.length, color: SMS_INK.reminder },
+          { label: 'Follow-up texts', value: fuTexts.length, color: SMS_INK.followup },
+        ]
+      : [
+          { label: 'This month', value: sentMonth, color: RECENCY[0] },
+          { label: 'Last month', value: sentLast, color: RECENCY[1] },
+          { label: 'Earlier', value: Math.max(0, used - sentMonth - sentLast), color: RECENCY[2] },
+        ]
 
   return (
     <>
-      <div className="rp-com-toggle">
-        <button className={view === 'overall' ? 'on' : ''} onClick={() => setView('overall')}>Overall Usage</button>
-        <button className={view === 'followup' ? 'on' : ''} onClick={() => setView('followup')}>Follow up Text Usage</button>
+      <div className="rp-com-bar">
+        <div className="rp-com-toggle">
+          <button className={view === 'overall' ? 'on' : ''} onClick={() => setView('overall')}>Overall Usage</button>
+          <button className={view === 'followup' ? 'on' : ''} onClick={() => setView('followup')}>Follow up Text Usage</button>
+        </div>
+        <div className="rp-com-type">
+          <select defaultValue="NONMASKING">
+            <option>NONMASKING</option>
+            <option>MASKING</option>
+          </select>
+        </div>
       </div>
-      <div className="rp-com-type">
-        <select defaultValue="NONMASKING">
-          <option>NONMASKING</option>
-          <option>MASKING</option>
-        </select>
-      </div>
-      <div className="rp-kpis four">
-        {cards.map(([label, value]) => (
-          <div key={label} className="rp-kpi head-tinted" style={{ '--tint': COLORS.green }}>
-            <div className="rp-kpi-label caps">{label}</div>
-            <div className="rp-kpi-big">{value.toLocaleString()}</div>
+
+      <div className="rp-card rp-quota">
+        <div className="rp-quota-top">
+          <div>
+            <div className="rp-quota-cap">SMS REMAINING</div>
+            <div className="rp-quota-hero">{remaining.toLocaleString()}</div>
           </div>
-        ))}
+          <div className="rp-quota-facts">
+            <span><em>Availed</em><b>{SMS_QUOTA.toLocaleString()}</b></span>
+            <span><em>Used</em><b>{used.toLocaleString()}</b></span>
+            <span><em>Consumed</em><b>{pctText}%</b></span>
+          </div>
+        </div>
+        <Meter value={used} max={SMS_QUOTA} color={SMS_INK.followup} ticks={['0', SMS_QUOTA.toLocaleString()]} />
       </div>
+
+      <div className="rp-duo wide">
+        <div className="rp-card">
+          <div className="rp-card-head">
+            <h4>SMS sent per month</h4>
+            <span className="rp-card-note">Last 6 months</span>
+          </div>
+          <GroupedBars groups={groups} series={series} hideZeros />
+        </div>
+        <div className="rp-card">
+          <div className="rp-card-head">
+            <h4>{view === 'overall' ? 'Message mix' : 'When they went out'}</h4>
+          </div>
+          {used > 0 ? (
+            <Donut data={split} total={used} caption="SMS USED" />
+          ) : (
+            <p className="rp-none">Nothing sent yet in this view.</p>
+          )}
+        </div>
+      </div>
+
+      <div className="rp-kpis three">
+        <div className="rp-kpi">
+          <div className="rp-kpi-label caps">SMS SENT TODAY</div>
+          <div className="rp-kpi-big">{sentToday.toLocaleString()}</div>
+          <div className="rp-kpi-sub">{prettyFull(today)}</div>
+        </div>
+        <div className="rp-kpi">
+          <div className="rp-kpi-label caps">SMS SENT THIS MONTH</div>
+          <div className="rp-kpi-big">{sentMonth.toLocaleString()}</div>
+          <div className={`rp-kpi-sub delta ${delta > 0 ? 'up' : delta < 0 ? 'down' : ''}`}>
+            {delta === 0 ? 'Level with last month' : `${delta > 0 ? '▲' : '▼'} ${Math.abs(delta)} vs last month`}
+          </div>
+        </div>
+        <div className="rp-kpi">
+          <div className="rp-kpi-label caps">SMS SENT LAST MONTH</div>
+          <div className="rp-kpi-big">{sentLast.toLocaleString()}</div>
+          <div className="rp-kpi-sub">{monthName(lastMonth)}</div>
+        </div>
+      </div>
+
       <p className="rp-none">
         Reminder texts are counted per confirmed booking and follow-up texts per saved pad sheet —
         demo figures, not a live SMS gateway.
